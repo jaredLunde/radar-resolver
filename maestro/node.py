@@ -31,20 +31,22 @@ class Node(Members):
 
     def _compile(self):
         """ Sets :class:Field attributes """
-        add_field = self.fields.append
         for field_name, field in self._getmembers():
             if isinstance(field, (Field, Node)):
-                field = field.copy()
-                field.__NAME__ = field_name
-                add_field(field)
-                setattr(self, field_name, field)
-
-                if isinstance(field, Field) and field.key is True:
-                    self._key = field
+                self.add_field(field_name, field)
 
         if self._key is None:
             raise NodeKeyError(f'Node `{self.__NAME__}` does not have a '
                                  'designated key but requires one.')
+
+    def add_field(self, field_name, field):
+        field = field.copy()
+        field.__NAME__ = field_name
+        self.fields.append(field)
+        setattr(self, field_name, field)
+
+        if isinstance(field, Field) and field.key is True:
+            self._key = field
 
     @property
     def key(self):
@@ -143,7 +145,7 @@ class Node(Members):
         if self._key.__NAME__ not in fields:
             self.resolve_field(self._key.__NAME__)
 
-        out['__maestroKey__'] = self.key
+        out['@key'] = self.key
 
         try:
             return self.callback(self, out)

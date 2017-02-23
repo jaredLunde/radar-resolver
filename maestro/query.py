@@ -1,7 +1,8 @@
 from vital.debug import preprX
 from maestro.members import Members
 from maestro.node import Node
-from maestro.exceptions import QueryError, NodeIsNull
+from maestro.interface import Interface
+from maestro.exceptions import QueryError, QueryErrors, NodeIsNull
 
 
 class Query(Members):
@@ -27,7 +28,7 @@ class Query(Members):
         set_node = self.__setattr__
 
         for node_name, node in self._getmembers():
-            if isinstance(node, Node):
+            if isinstance(node, (Node, Interface)):
                 node = node.copy()
                 add_node(node)
                 add_node_name(node_name)
@@ -56,8 +57,9 @@ class Query(Members):
 
                 yield (node_name, node.get_required_fields(fields))
         else:
-            for node in self.nodes:
-                yield (node.__NAME__, node.get_required_fields())
+            for node_name in self.node_names:
+                node = getattr(self, node_name)
+                yield (node_name, node.get_required_fields())
 
     def require(self, **nodes):
         self.required_nodes = dict(self.get_required_nodes(nodes))
@@ -83,7 +85,8 @@ class Query(Members):
                 result = node.resolve(self, fields)
             except NodeIsNull:
                 result = None
-
+            except QueryErrors as e:
+                result = e.for_json()
             out[node_name] = result
 
         try:
