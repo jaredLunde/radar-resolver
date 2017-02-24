@@ -1,56 +1,62 @@
-from maestro.node import Node
-from maestro.fields.field import Field
+import json
+from vital.debug import preprX
+
+from maestro.fields import Field
+from maestro.members import Members
+from maestro.utils import to_js_keys
 
 
-class Interface(Node):
-    key = None
+JS_TPL = '''const {name} = Maestro.createInterface({
+  name: '{name}',
+  fields: {shape}
+})'''
 
-    def __init__(self, *args, **kwargs):
-        self.implementation_fields = []
-        super().__init__(*args, **kwargs)
-        del self._key
+
+class Interface(Members):
+
+    def __init__(self):
+        """ @many: will return #list if @many is |True|
+        """
+        self.__NAME__ = self.__NAME__ if hasattr(self, '__NAME__') else \
+                        self.__class__.__name__
+        self._fields = []
+        self._compile()
+
+    __repr__ = preprX('__NAME__', 'fields', address=False)
 
     def _compile(self):
+        """ Sets :class:Field attributes """
         for field_name, field in self._getmembers():
-            if isinstance(field, (Node, Field)):
+            if isinstance(field, (Field, Interface)):
                 self.add_field(field_name, field)
 
-        for field in self.fields:
-            for ifield in self.implementation_fields:
-                field.add_field(ifield.__NAME__, ifield)
-
     def add_field(self, field_name, field):
-        is_field = isinstance(field, Field)
-        is_node = isinstance(field, Node)
-
-        if is_field:
-            field = field.copy()
-            field.__NAME__ = field_name
-            self.implementation_fields.append(field)
-
-        if is_node:
-            field.__NAME__ = field_name
-            self.fields.append(field)
-
+        field = field.copy()
+        field.__NAME__ = field_name
+        self._fields.append(field)
         setattr(self, field_name, field)
 
     @property
-    def resolve_type(self):
-        raise TypeError('Interfaces require a `resolve_type` property which '
-                        'returns a string specifying the proper Node to '
-                        'resolve for each iteration.')
+    def fields(self):
+        return self._fields
 
-    def resolve_fields(self, fields={}):
-        field_name = self.resolve_type
-        result = self.resolve_field(field_name, fields.get(field_name))
-        result['@node'] = field_name
+    def to_js(self, indent=2, plugins=None):
+        shape = {}
 
-        return result
+        for field in self._fields:
+            if isinstance(field, self.__class__):
+                shape[field.__NAME__] = field.to_js()
+            else:
+                shape[field.__NAME__] = field.default
 
-    def _resolve(self, fields):
-        out = self.resolve_fields(fields)
+        if plugins:
+            for plugin in plugins:
+                shape = plugin(shape)
 
-        try:
-            return self.callback(self, out)
-        except TypeError:
-            return out
+        output = JS_TPL.format(name=self.__NAME__,
+                               shape=json.dumps(shape, indent=indent))
+
+        return to_js_keys(output)
+
+    def copy(self):
+        return self.__class__()

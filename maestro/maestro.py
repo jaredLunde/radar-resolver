@@ -47,14 +47,14 @@ class Maestro(object):
         return self.actions[action_name].copy()
 
     def resolve_query(self, query_data):
-        query_schemas = query_data.get('schemas')
+        query_requires = query_data.get('requires')
         query_params = query_data.get('params', {})
         query = self.get_query(query_data['type'])
         result = None
 
         try:
-            if query_schemas:
-                query.require(**query_schemas)
+            if query_requires:
+                query.require(**query_requires)
 
             result = query.resolve(**query_params)
         except QueryError as e:
@@ -69,11 +69,11 @@ class Maestro(object):
 
     def resolve_action(self, action_data):
         action_input = action_data.get('input', {})
-        action_schemas = action_data.get('schemas', {})
+        action_requires = action_data.get('requires', {})
         action = self.get_action(action_data['type'])
 
-        if action_schemas:
-            action.require(**action_schemas)
+        if action_requires:
+            action.require(**action_requires)
 
         return action.resolve(**action_input)
 

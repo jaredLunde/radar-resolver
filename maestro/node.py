@@ -4,23 +4,29 @@ from vital.debug import preprX
 from maestro.fields import Field, Obj
 from maestro.exceptions import FieldNotFound, NodeKeyError
 from maestro.members import Members
+from maestro.interface import Interface
 from maestro.utils import to_js_keys
 
 
-JS_TPL = '''const {name} = Maestro.createSchema({
+JS_TPL = '''import Maestro from 'maestro'
+{imports}
+
+
+export default Maestro.createNode({{
   name: '{name}',
+  implements: {interfaces},
   fields: {shape}
-})'''
+}})'''
 
 
-class Node(Members):
+class Node(Interface):
 
     def __init__(self, callback=None, many=False):
         """ @many: will return #list if @many is |True|
         """
-        self.__NAME__ = self.__NAME__ if hasattr(self, '__NAME__') else \
-                        self.__class__.__name__
-        self.fields = []
+        super().__init__()
+        self.implements = [] if not hasattr(self, 'implements') else\
+                          self.implements
         self.parent = None
         self._key = None
         self.callback = callback
@@ -31,22 +37,28 @@ class Node(Members):
 
     def _compile(self):
         """ Sets :class:Field attributes """
-        for field_name, field in self._getmembers():
-            if isinstance(field, (Field, Node)):
-                self.add_field(field_name, field)
+        super()._compile()
 
         if self._key is None:
             raise NodeKeyError(f'Node `{self.__NAME__}` does not have a '
                                  'designated key but requires one.')
 
     def add_field(self, field_name, field):
-        field = field.copy()
-        field.__NAME__ = field_name
-        self.fields.append(field)
-        setattr(self, field_name, field)
+        super().add_field(field_name, field)
+        field = self._fields[-1]
 
         if isinstance(field, Field) and field.key is True:
             self._key = field
+
+    def implement(self, *interfaces):
+        for interface_cls in interfaces:
+            interface = interface_cls()
+            self.implements.append(interface)
+
+            for field in interface.fields:
+                self.add_field(field.__NAME__, field)
+
+        return self
 
     @property
     def key(self):
@@ -56,24 +68,6 @@ class Node(Members):
         raise NodeKeyError(f'Node `{self.__NAME__}` did not have a Key field '
                            'with a value. Your Key field cannot ever return '
                            'None.')
-
-    def to_js(self, indent=2, plugins=None):
-        shape = {}
-
-        for field in self.fields:
-            if isinstance(field, self.__class__):
-                shape[field.__NAME__] = field.to_js()
-            else:
-                shape[field.__NAME__] = field.default
-
-        if plugins:
-            for plugin in plugins:
-                shape = plugin(shape)
-
-        output = JS_TPL.format(name=self.__NAME__,
-                               shape=json.dumps(shape, indent=indent))
-
-        return to_js_keys(output)
 
     def get_field(self, field_name):
         field = getattr(self, field_name)
@@ -106,7 +100,7 @@ class Node(Members):
         fields = {}
 
         if input_fields is None or not len(input_fields):
-            for field in self.fields:
+            for field in self._fields:
                 fields.update(self.get_required_field(field))
         else:
             for field_name, child_fields in input_fields.items():
@@ -136,7 +130,7 @@ class Node(Members):
                 else:
                     yield (field_name, self.resolve_field(field_name))
         else:
-            for field in self.fields:
+            for field in self._fields:
                 yield (field.__NAME__, self.resolve_field(field.__NAME__))
 
     def _resolve(self, fields):
@@ -169,7 +163,7 @@ class Node(Members):
         return self
 
     def clear(self):
-        for field in self.fields:
+        for field in self._fields:
             field.clear()
 
         return self
@@ -178,3 +172,41 @@ class Node(Members):
         cls = self.__class__(callback=self.callback, many=self.many)
         cls.parent = self.parent
         return cls
+
+    def to_js(self, indent=2, plugins=None):
+        shape = {}
+        interface_fields = [field.__NAME__
+                            for interface in self.implements
+                            for field in interface.fields]
+
+        for field in self._fields:
+            if isinstance(field, self.__class__):
+                shape[field.__NAME__] = field.to_js()
+            elif field.__NAME__ not in interface_fields:
+                shape[field.__NAME__] = field.default
+
+        if plugins:
+            for plugin in plugins:
+                shape = plugin(shape)
+
+        shape = '\n'.join(
+            (' ' * indent) + line if idx > 0 else line
+            for idx, line in
+                enumerate(json.dumps(shape, indent=indent).split('\n'))
+        )
+
+        interface_names = [interface.__NAME__ for interface in self.implements]
+
+        imports = [
+            f"import {iface.__NAME__} from '../interfaces/{iface.__NAME__}'"
+            for iface in self.implements
+        ]
+
+        output = JS_TPL.format(
+            name=self.__NAME__,
+            shape=shape,
+            interfaces=str(interface_names).replace("'", ''),
+            imports='\n'.join(imports)
+        )
+
+        return to_js_keys(output)

@@ -2,8 +2,13 @@ import json
 import random
 from maestro.node import Node
 from maestro.query import Query
+from maestro.union import Union
 from maestro.interface import Interface
 from maestro.fields import String, Array, Int
+
+
+class SearchInterface(Interface):
+    preview_text = String(lambda f, n: f'Preview for {n.__NAME__}')
 
 
 class PicturesNode(Node):
@@ -16,12 +21,11 @@ class VideosNode(Node):
     quality = String(lambda f, n: '240p')
 
 
-class SearchInterface(Interface):
+class SearchUnion(Union):
     # Nodes
-    picture = PicturesNode()
-    video = VideosNode()
-    # Implementation Fields
-    preview_text = String(lambda field, node: f'Preview for {node.__NAME__}')
+    picture = PicturesNode().implement(SearchInterface)
+    video = VideosNode().implement(SearchInterface)
+    # preview_text = String(lambda field, node: f'Preview for {node.__NAME__}')
     def __iter__(self):
         self.current = -1
         self.count = 6
@@ -33,12 +37,12 @@ class SearchInterface(Interface):
         else:
             return self
     @property
-    def resolve_type(self):
+    def node_type(self):
         return random.choice(['picture', 'video'])
 
 
 class SearchQuery(Query):
-    results = SearchInterface(many=True)
+    results = SearchUnion(many=True)
     def apply(self, **params):
         pass
 
