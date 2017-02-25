@@ -1,10 +1,10 @@
 import json
 import random
-from maestro.node import Node
-from maestro.query import Query
-from maestro.union import Union
-from maestro.interface import Interface
-from maestro.fields import String, Array, Int
+from radar.node import Node
+from radar.query import Query
+from radar.union import Union
+from radar.interface import Interface
+from radar.fields import String, Array, Int
 
 
 class SearchInterface(Interface):
@@ -18,13 +18,13 @@ class PicturesNode(Node):
 
 class VideosNode(Node):
     uid = String(lambda f, n: 'xYzBzcdD', key=True)
-    quality = String(lambda f, n: '240p')
+    quality_bar = String(lambda f, n: '240p')
 
 
 class SearchUnion(Union):
     # Nodes
     picture = PicturesNode().implement(SearchInterface)
-    video = VideosNode().implement(SearchInterface)
+    video_stuff = VideosNode().implement(SearchInterface)
     # preview_text = String(lambda field, node: f'Preview for {node.__NAME__}')
     def __iter__(self):
         self.current = -1
@@ -38,7 +38,7 @@ class SearchUnion(Union):
             return self
     @property
     def node_type(self):
-        return random.choice(['picture', 'video'])
+        return random.choice(['picture', 'video_stuff'])
 
 
 class SearchQuery(Query):
@@ -48,4 +48,7 @@ class SearchQuery(Query):
 
 
 sq = SearchQuery()
+# sq.transform_keys(False)
+# sq._transform_keys = True
+# sq.require({'previewText': null})
 print(json.dumps(sq.resolve(), indent=2))

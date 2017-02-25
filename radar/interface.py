@@ -1,9 +1,9 @@
 import json
 from vital.debug import preprX
 
-from maestro.fields import Field
-from maestro.members import Members
-from maestro.utils import to_js_keys
+from radar.fields import Field
+from radar.members import Members
+from radar.utils import to_js_keys
 
 
 JS_TPL = '''const {name} = Maestro.createInterface({

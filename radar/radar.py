@@ -3,17 +3,22 @@ try:
 except ImportError:
     import json
 
-from maestro.exceptions import QueryError, ActionError, OperationNotFound
+from radar.exceptions import QueryError, ActionError, OperationNotFound
 
 
-class Maestro(object):
+class Radar(object):
 
-    def __init__(self, queries=None, actions=None, raises=True):
+    def __init__(self, queries=None, actions=None, raises=True,
+                 transform_keys=True):
+        """ @transform_keys: if |True|, transforms JS camelCase keys to Python
+                underscore_case and vice-versa
+        """
         self.queries = {}
         self.install_query(*queries or [])
         self.actions = {}
         self.install_action(*actions or [])
         self.raises = raises
+        self.transform_keys = transform_keys
 
     def __call__(self, data, is_json=True):
         return self.resolve(data, is_json=is_json)
@@ -56,9 +61,11 @@ class Maestro(object):
             if query_requires:
                 query.require(**query_requires)
 
+            query.transform_keys(self.transform_keys)
+
             result = query.resolve(**query_params)
         except QueryError as e:
-            result[query_name] = str(e)
+            result[query.__NAME__] = str(e)
         except Exception as e:
             if self.raises:
                 raise e
@@ -74,6 +81,8 @@ class Maestro(object):
 
         if action_requires:
             action.require(**action_requires)
+
+        action.transform_keys(self.transform_keys)
 
         return action.resolve(**action_input)
 

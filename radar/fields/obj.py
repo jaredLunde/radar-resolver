@@ -1,12 +1,13 @@
-from maestro.fields.field import Field
-from maestro.members import Members
-from maestro.exceptions import FieldNotFound
+from radar.fields.field import Field
+from radar.members import Members
+from radar.exceptions import FieldNotFound
+from radar.utils import transform_keys
 
 
 def obj_resolver(obj_field, node, fields):
     fields = fields or []
     return obj_field.set_value({
-        field.name: field.resolve(node)
+        transform_keys(field.name, node._transform_keys): field.resolve(node)
         for field in obj_field.get_fields(*fields)
     })
 

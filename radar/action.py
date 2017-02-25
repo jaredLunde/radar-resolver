@@ -1,4 +1,4 @@
-from maestro.query import Query
+from radar.query import Query
 
 
 class Action(Query):

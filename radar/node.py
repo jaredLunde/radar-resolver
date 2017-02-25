@@ -1,14 +1,14 @@
 import json
 from vital.debug import preprX
 
-from maestro.fields import Field, Obj
-from maestro.exceptions import FieldNotFound, NodeKeyError
-from maestro.members import Members
-from maestro.interface import Interface
-from maestro.utils import to_js_keys
+from radar.fields import Field, Obj
+from radar.exceptions import FieldNotFound, NodeKeyError
+from radar.members import Members
+from radar.interface import Interface
+from radar.utils import to_js_keys, transform_keys
 
 
-JS_TPL = '''import Maestro from 'maestro'
+JS_TPL = '''import Maestro from 'radar'
 {imports}
 
 
@@ -31,6 +31,7 @@ class Node(Interface):
         self._key = None
         self.callback = callback
         self.many = many
+        self._transform_keys = None
         self._compile()
 
     __repr__ = preprX('__NAME__', 'fields', address=False)
@@ -42,6 +43,9 @@ class Node(Interface):
         if self._key is None:
             raise NodeKeyError(f'Node `{self.__NAME__}` does not have a '
                                  'designated key but requires one.')
+
+    def transform_keys(self, truthy_falsy=None):
+        self._transform_keys = True if truthy_falsy is None else truthy_falsy
 
     def add_field(self, field_name, field):
         super().add_field(field_name, field)
@@ -89,7 +93,7 @@ class Node(Interface):
                     child_fields[_field.__NAME__] if child_fields else None
                 )
                 for _field in field.fields
-                if child_fields or _field.__NAME__ in child_fields
+                if child_fields and _field.__NAME__ in child_fields
             }
         else:
             fields[field.__NAME__] = None
@@ -111,7 +115,7 @@ class Node(Interface):
         return fields
 
     def resolve_field(self, field_name, sub_fields=None):
-        field = self.get_field(field_name)
+        field = self.get_field(self.transform(field_name, False))
 
         if isinstance(field, Node):
             return field.resolve(self, sub_fields)
@@ -121,6 +125,9 @@ class Node(Interface):
 
             return field.resolve(self, sub_fields)
 
+    def transform(self, field_name, to_js=True):
+        return transform_keys(field_name, self.parent._transform_keys, to_js)
+
     def resolve_fields(self, fields):
         if fields:
             for field_name, sub_fields in fields.items():
@@ -128,13 +135,16 @@ class Node(Interface):
                     yield (field_name,
                            self.resolve_field(field_name, sub_fields))
                 else:
-                    yield (field_name, self.resolve_field(field_name))
+                    yield (field_name,
+                           self.resolve_field(field_name))
         else:
             for field in self._fields:
-                yield (field.__NAME__, self.resolve_field(field.__NAME__))
+                yield (field.__NAME__,
+                       self.resolve_field(field.__NAME__))
 
     def _resolve(self, fields):
-        out = {name: value for name, value in self.resolve_fields(fields)}
+        out = {self.transform(name): value
+               for name, value in self.resolve_fields(fields)}
 
         if self._key.__NAME__ not in fields:
             self.resolve_field(self._key.__NAME__)
@@ -150,6 +160,7 @@ class Node(Interface):
         return [node._resolve(fields) for node in self]
 
     def resolve(self, parent, fields):
+        self.transform_keys(parent._transform_keys)
         self.clear()
         self.set_parent(parent)
 

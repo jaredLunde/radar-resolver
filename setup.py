@@ -6,8 +6,8 @@ from pip.req import parse_requirements
 from pkgutil import walk_packages
 
 
-PKG = 'maestro'
-PKG_NAME = 'maestro'
+PKG = 'radar'
+PKG_NAME = 'radar'
 PKG_VERSION = '0.1.0'
 
 pathname = os.path.dirname(os.path.realpath(__file__))
@@ -33,7 +33,7 @@ setup(
     description='A python handler for Maestro compositions',
     author='Jared Lunde',
     author_email='jared.lunde@gmail.com',
-    url='https://github.com/jaredlunde/maestro',
+    url='https://github.com/jaredlunde/radar-py',
     license="MIT",
     install_requires=[str(ir.req) for ir in install_reqs],
     packages=list(find_packages(PKG))

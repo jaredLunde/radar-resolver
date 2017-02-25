@@ -1,9 +1,9 @@
 from vital.debug import preprX
-from maestro.members import Members
-from maestro.node import Node
-from maestro.interface import Interface
-from maestro.exceptions import QueryError, QueryErrors, NodeIsNull
-
+from radar.members import Members
+from radar.node import Node
+from radar.interface import Interface
+from radar.exceptions import QueryError, QueryErrors, NodeIsNull
+from radar.utils import transform_keys
 
 class Query(Members):
 
@@ -17,9 +17,16 @@ class Query(Members):
         self.params = {}
         self.required_nodes = None
         self.install(*plugins or [])
+        self._transform_keys = None
         self._compile()
 
     __repr__ = preprX('__NAME__', address=False)
+
+    def transform_keys(self, truthy_falsy=None):
+        self._transform_keys = True if truthy_falsy is None else truthy_falsy
+
+    def transform(self, field_name, to_js=True):
+        return transform_keys(field_name, self._transform_keys, to_js)
 
     def _compile(self):
         """ Sets :class:Node attributes """
@@ -49,9 +56,11 @@ class Query(Members):
     def get_required_nodes(self, nodes):
         if nodes:
             for node_name, fields in nodes.items():
+                node_name = self.transform(node_name, False)
+
                 try:
                     node = getattr(self, node_name)
-                except AttributeErrror:
+                except AttributeError:
                     raise QueryError(f'Node `{node_name}` not found in '
                                      f'Query `{self.__NAME__}`.')
 
@@ -76,9 +85,11 @@ class Query(Members):
         self.execute_plugins(**params)
         #: Executes the apply function which is meant to perform the actual
         #  query task
-        self.apply(**params)
+        if hasattr(self, 'apply'):
+            self.apply(**params)
 
         for node_name, fields in self.required_nodes.items():
+            node_name = self.transform(node_name)
             node = getattr(self, node_name).copy()
 
             try:
