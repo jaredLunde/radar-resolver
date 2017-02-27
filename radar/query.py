@@ -2,7 +2,7 @@ from vital.debug import preprX
 from radar.members import Members
 from radar.node import Node
 from radar.interface import Interface
-from radar.exceptions import QueryError, QueryErrors, NodeIsNull
+from radar.exceptions import QueryError, QueryErrors, ActionErrors, NodeIsNull
 from radar.utils import transform_keys
 
 class Query(Members):
@@ -60,6 +60,8 @@ class Query(Members):
 
                 try:
                     node = getattr(self, node_name)
+                    node.transform_keys(self._transform_keys)
+                    node.set_parent(self)
                 except AttributeError:
                     raise QueryError(f'Node `{node_name}` not found in '
                                      f'Query `{self.__NAME__}`.')
@@ -68,6 +70,7 @@ class Query(Members):
         else:
             for node_name in self.node_names:
                 node = getattr(self, node_name)
+                node.transform_keys(self._transform_keys)
                 yield (node_name, node.get_required_fields())
 
     def require(self, **nodes):
@@ -86,18 +89,23 @@ class Query(Members):
         #: Executes the apply function which is meant to perform the actual
         #  query task
         if hasattr(self, 'apply'):
-            self.apply(**params)
+            try:
+                self.apply(**params)
+            except (QueryErrors, ActionErrors) as e:
+                return e.for_json()
 
         for node_name, fields in self.required_nodes.items():
             node_name = self.transform(node_name)
             node = getattr(self, node_name).copy()
-
+            node.transform_keys(self._transform_keys)
+            
             try:
                 result = node.resolve(self, fields)
             except NodeIsNull:
                 result = None
-            except QueryErrors as e:
-                result = e.for_json()
+            except (QueryErrors, ActionErrors) as e:
+                return e.for_json()
+
             out[node_name] = result
 
         try:

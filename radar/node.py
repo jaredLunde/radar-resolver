@@ -5,14 +5,13 @@ from radar.fields import Field, Obj
 from radar.exceptions import FieldNotFound, NodeKeyError
 from radar.members import Members
 from radar.interface import Interface
-from radar.utils import to_js_keys, transform_keys
+from radar.utils import to_js_keys, transform_keys, to_js_shape
 
 
-JS_TPL = '''import Maestro from 'radar'
-{imports}
+JS_TPL = '''import {{createNode}} from 'react-radar'{imports}
 
 
-export default Maestro.createNode({{
+export default createNode({{
   name: '{name}',
   implements: {interfaces},
   fields: {shape}
@@ -24,21 +23,21 @@ class Node(Interface):
     def __init__(self, callback=None, many=False):
         """ @many: will return #list if @many is |True|
         """
-        super().__init__()
         self.implements = [] if not hasattr(self, 'implements') else\
                           self.implements
         self.parent = None
         self._key = None
         self.callback = callback
         self.many = many
-        self._transform_keys = None
-        self._compile()
+        self._transform_keys = True
+        super().__init__()
 
     __repr__ = preprX('__NAME__', 'fields', address=False)
 
     def _compile(self):
         """ Sets :class:Field attributes """
         super()._compile()
+        self.implement(*self.implements)
 
         if self._key is None:
             raise NodeKeyError(f'Node `{self.__NAME__}` does not have a '
@@ -57,7 +56,9 @@ class Node(Interface):
     def implement(self, *interfaces):
         for interface_cls in interfaces:
             interface = interface_cls()
-            self.implements.append(interface)
+
+            if interface_cls not in self.implements:
+                self.implements.append(interface_cls)
 
             for field in interface.fields:
                 self.add_field(field.__NAME__, field)
@@ -108,6 +109,7 @@ class Node(Interface):
                 fields.update(self.get_required_field(field))
         else:
             for field_name, child_fields in input_fields.items():
+                field_name = self.transform(field_name, False)
                 field = getattr(self, field_name)
                 required_fields = self.get_required_field(field, child_fields)
                 fields.update(required_fields)
@@ -126,7 +128,7 @@ class Node(Interface):
             return field.resolve(self, sub_fields)
 
     def transform(self, field_name, to_js=True):
-        return transform_keys(field_name, self.parent._transform_keys, to_js)
+        return transform_keys(field_name, self._transform_keys, to_js)
 
     def resolve_fields(self, fields):
         if fields:
@@ -186,38 +188,49 @@ class Node(Interface):
 
     def to_js(self, indent=2, plugins=None):
         shape = {}
-        interface_fields = [field.__NAME__
-                            for interface in self.implements
-                            for field in interface.fields]
+
+        interface_fields = set()
+        interface_names = []
+
+        for interface_cls in self.implements:
+            interface = interface_cls()
+            interface_fields = interface_fields.union(
+                set(field.__NAME__ for field in interface.fields)
+            )
+            interface_names.append(interface.__NAME__)
+
+        nodes = [node for node in self.fields if isinstance(node, Node)]
 
         for field in self._fields:
-            if isinstance(field, self.__class__):
-                shape[field.__NAME__] = field.to_js()
+            if isinstance(field, Node):
+                shape[self.transform(field.__NAME__)] =\
+                    f'{field.__class__.__name__}.fields'
             elif field.__NAME__ not in interface_fields:
-                shape[field.__NAME__] = field.default
+                if isinstance(field, Obj):
+                    # TODO
+                    shape[self.transform(field.__NAME__)] = None
+                else:
+                    shape[self.transform(field.__NAME__)] = None
 
         if plugins:
             for plugin in plugins:
                 shape = plugin(shape)
 
-        shape = '\n'.join(
-            (' ' * indent) + line if idx > 0 else line
-            for idx, line in
-                enumerate(json.dumps(shape, indent=indent).split('\n'))
-        )
-
-        interface_names = [interface.__NAME__ for interface in self.implements]
-
         imports = [
-            f"import {iface.__NAME__} from '../interfaces/{iface.__NAME__}'"
-            for iface in self.implements
+            f"import {iface} from '../interfaces/{iface}'"
+            for iface in interface_names
         ]
+
+        imports.extend(
+            f"import {node.__class__().__NAME__} from './{node.__class__().__NAME__}'"
+            for node in self.fields if isinstance(node, Node)
+        )
 
         output = JS_TPL.format(
             name=self.__NAME__,
-            shape=shape,
+            shape=to_js_shape(shape, indent),
             interfaces=str(interface_names).replace("'", ''),
-            imports='\n'.join(imports)
+            imports='\n' + '\n'.join(imports) if imports else ''
         )
 
         return to_js_keys(output)

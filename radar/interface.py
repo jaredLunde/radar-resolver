@@ -3,13 +3,16 @@ from vital.debug import preprX
 
 from radar.fields import Field
 from radar.members import Members
-from radar.utils import to_js_keys
+from radar.utils import to_js_keys, to_js_shape
 
 
-JS_TPL = '''const {name} = Maestro.createInterface({
+JS_TPL = '''import {{createInterface}} from 'react-radar'
+
+
+export default createInterface({{
   name: '{name}',
   fields: {shape}
-})'''
+}})'''
 
 
 class Interface(Members):
@@ -54,7 +57,7 @@ class Interface(Members):
                 shape = plugin(shape)
 
         output = JS_TPL.format(name=self.__NAME__,
-                               shape=json.dumps(shape, indent=indent))
+                               shape=to_js_shape(shape, indent))
 
         return to_js_keys(output)
 

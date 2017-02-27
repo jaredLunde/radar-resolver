@@ -21,8 +21,10 @@ class QueryErrors(Exception):
         self.code = code
 
     def for_json(self):
-        return [{'message': message, 'code': self.code}
-                for message in self.messages]
+        return {
+            'errors': [{'message': message, 'code': self.code}
+                       for message in self.messages]
+        }
 
 
 class ActionErrors(QueryErrors):

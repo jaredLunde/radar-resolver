@@ -58,10 +58,10 @@ class Radar(object):
         result = None
 
         try:
+            query.transform_keys(self.transform_keys)
+
             if query_requires:
                 query.require(**query_requires)
-
-            query.transform_keys(self.transform_keys)
 
             result = query.resolve(**query_params)
         except QueryError as e:
@@ -78,11 +78,10 @@ class Radar(object):
         action_input = action_data.get('input', {})
         action_requires = action_data.get('requires', {})
         action = self.get_action(action_data['type'])
+        action.transform_keys(self.transform_keys)
 
         if action_requires:
             action.require(**action_requires)
-
-        action.transform_keys(self.transform_keys)
 
         return action.resolve(**action_input)
 
