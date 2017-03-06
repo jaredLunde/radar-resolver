@@ -7,7 +7,7 @@ from pkgutil import walk_packages
 
 
 PKG = 'radar'
-PKG_NAME = 'radar'
+PKG_NAME = 'radar-resolver'
 PKG_VERSION = '0.1.0'
 
 pathname = os.path.dirname(os.path.realpath(__file__))
@@ -30,10 +30,10 @@ def find_packages(prefix=""):
 setup(
     name=PKG_NAME,
     version=PKG_VERSION,
-    description='A python handler for Maestro compositions',
+    description='A python resolver for react-radar Queries and Actions',
     author='Jared Lunde',
     author_email='jared.lunde@gmail.com',
-    url='https://github.com/jaredlunde/radar-py',
+    url='https://github.com/jaredlunde/radar-resolver',
     license="MIT",
     install_requires=[str(ir.req) for ir in install_reqs],
     packages=list(find_packages(PKG))

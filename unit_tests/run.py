@@ -5,7 +5,7 @@ import sys
 
 
 cd = os.path.dirname(os.path.abspath(__file__))
-path = cd.split('maestro')[0] + 'maestro'
+path = cd.split('radar')[0] + 'radar'
 sys.path.insert(0, path)
 
 
