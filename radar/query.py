@@ -5,6 +5,7 @@ from radar.interface import Interface
 from radar.exceptions import QueryError, QueryErrors, ActionErrors, NodeIsNull
 from radar.utils import transform_keys
 
+
 class Query(Members):
 
     def __init__(self, plugins=None, callback=None):
@@ -79,18 +80,18 @@ class Query(Members):
 
     def resolve(self, **params):
         out = {}
-
-        self.params = params
+        self.params = {transform_keys(key, self._transform_keys, False): val
+                       for key, val in params.items()}
         self.required_nodes = self.required_nodes or \
                               dict(self.get_required_nodes({}))
 
         #: Execute local plugins
-        self.execute_plugins(**params)
+        self.execute_plugins(**self.params)
         #: Executes the apply function which is meant to perform the actual
         #  query task
         if hasattr(self, 'apply'):
             try:
-                self.apply(**params)
+                self.apply(**self.params)
             except (QueryErrors, ActionErrors) as e:
                 return e.for_json()
 
@@ -98,7 +99,7 @@ class Query(Members):
             node_name = self.transform(node_name)
             node = getattr(self, node_name).copy()
             node.transform_keys(self._transform_keys)
-            
+
             try:
                 result = node.resolve(self, fields)
             except NodeIsNull:

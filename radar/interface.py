@@ -27,6 +27,9 @@ class Interface(Members):
 
     __repr__ = preprX('__NAME__', 'fields', address=False)
 
+    '''def __new__(cls):
+        pass'''
+
     def _compile(self):
         """ Sets :class:Field attributes """
         for field_name, field in self._getmembers():
