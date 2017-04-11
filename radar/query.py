@@ -6,6 +6,13 @@ from radar.exceptions import QueryError, QueryErrors, ActionErrors, NodeIsNull
 from radar.utils import transform_keys
 
 
+def transform_deep_keys(params, do_transform=True):
+    return {transform_keys(key, do_transform, False):
+            (val if not isinstance(val, dict) else
+             transform_deep_keys(val, do_transform))
+            for key, val in params.items()}
+
+
 class Query(Members):
 
     def __init__(self, plugins=None, callback=None):
@@ -80,11 +87,9 @@ class Query(Members):
 
     def resolve(self, **params):
         out = {}
-        self.params = {transform_keys(key, self._transform_keys, False): val
-                       for key, val in params.items()}
+        self.params = transform_deep_keys(params, self._transform_keys)
         self.required_nodes = self.required_nodes or \
                               dict(self.get_required_nodes({}))
-
         #: Execute local plugins
         self.execute_plugins(**self.params)
         #: Executes the apply function which is meant to perform the actual
