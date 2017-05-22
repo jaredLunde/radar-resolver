@@ -77,6 +77,7 @@ class Query(Members):
                 yield (node_name, node.get_required_fields(fields))
         else:
             for node_name in self.node_names:
+                node_name = self.transform(node_name, False)
                 node = getattr(self, node_name)
                 node.transform_keys(self._transform_keys)
                 yield (node_name, node.get_required_fields())
@@ -101,9 +102,9 @@ class Query(Members):
                 return e.for_json()
 
         for node_name, fields in self.required_nodes.items():
-            node_name = self.transform(node_name)
             node = getattr(self, node_name).copy()
             node.transform_keys(self._transform_keys)
+            node_name = self.transform(node_name)
 
             try:
                 result = node.resolve(self, fields)
