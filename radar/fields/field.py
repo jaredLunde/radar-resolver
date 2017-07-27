@@ -45,4 +45,5 @@ class Field(object):
                               cast=self.cast)
 
     def resolve(self, node):
+        self.clear()
         return self.set_value(self.resolver(self, node))

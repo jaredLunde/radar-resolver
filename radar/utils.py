@@ -35,6 +35,7 @@ def to_snake(key):
 
 
 def transform_keys(key, truthy_falsy, to_js=True):
+    # print(repr(key))
     if truthy_falsy:
         camel = string_tools.camel_to_underscore(key) if to_js is False else\
                 to_snake(key)

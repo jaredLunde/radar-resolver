@@ -78,6 +78,8 @@ class Node(Interface):
         field = getattr(self, field_name)
 
         if isinstance(field, (Field, Node)):
+            if isinstance(field, Node):
+                field.set_parent(self.parent)
             return field
 
         raise FieldNotFound(f'Field named `{field_name}` was not found in '
@@ -110,7 +112,7 @@ class Node(Interface):
         else:
             for field_name, child_fields in input_fields.items():
                 field_name = self.transform(field_name, False)
-                field = getattr(self, field_name)
+                field = self.get_field(field_name)
                 required_fields = self.get_required_field(field, child_fields)
                 fields.update(required_fields)
 
@@ -164,7 +166,7 @@ class Node(Interface):
     def resolve(self, parent, fields):
         self.transform_keys(parent._transform_keys)
         self.clear()
-        self.set_parent(parent)
+        # self.set_parent(parent)
 
         if self.many:
             return self._resolve_many(fields)
