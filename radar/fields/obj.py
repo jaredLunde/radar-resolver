@@ -4,12 +4,15 @@ from radar.exceptions import FieldNotFound
 from radar.utils import transform_keys
 
 
-def obj_resolver(obj_field, node, fields):
-    fields = fields or []
-    return obj_field.set_value({
-        transform_keys(field.name, node._transform_keys): field.resolve(node)
-        for field in obj_field.get_fields(*fields)
-    })
+def obj_resolver(obj_field):
+    def resolver(query=None, node=None, fields=None, **data):
+        fields = fields or []
+        return obj_field.set_value({
+            transform_keys(field.name, node._transform_keys):
+                field.resolve(query=query, node=node, fields=fields, **data)
+            for field in obj_field.get_fields(*fields)
+        })
+    return resolver
 
 
 class Obj(Field, Members):
@@ -18,6 +21,7 @@ class Obj(Field, Members):
         cast = cast or dict
         super().__init__(obj_resolver, key=False, not_null=not_null,
                          default=default, cast=cast)
+        self.resolver = obj_resolver(self)
         self.fields = []
         self._compile()
 
@@ -46,8 +50,8 @@ class Obj(Field, Members):
                     raise FieldNotFound(f'Field "{field}" was not found in '
                                         f'the object "{self.name}"')
 
-    def resolve(self, node, fields=None):
-        return self.set_value(self.resolver(self, node, fields))
+    def resolve(self, query=None, **data):
+        return self.set_value(self.resolver(query=query, **data))
 
     def copy(self):
         return self.__class__(not_null=self.not_null,

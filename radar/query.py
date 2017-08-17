@@ -67,9 +67,8 @@ class Query(Members):
                 node_name = self.transform(node_name, False)
 
                 try:
-                    node = getattr(self, node_name)
+                    node = getattr(self, node_name).copy()
                     node.transform_keys(self._transform_keys)
-                    node.set_parent(self)
                 except AttributeError:
                     raise QueryError(f'Node `{node_name}` not found in '
                                      f'Query `{self.__NAME__}`.')
@@ -78,7 +77,7 @@ class Query(Members):
         else:
             for node_name in self.node_names:
                 node_name = self.transform(node_name, False)
-                node = getattr(self, node_name)
+                node = getattr(self, node_name).copy()
                 node.transform_keys(self._transform_keys)
                 yield (node_name, node.get_required_fields())
 
@@ -92,14 +91,18 @@ class Query(Members):
         self.required_nodes = self.required_nodes or \
                               dict(self.get_required_nodes({}))
         #: Execute local plugins
-        self.execute_plugins(**self.params)
+        self.execute_plugins(fields=self.required_nodes, **self.params)
         #: Executes the apply function which is meant to perform the actual
         #  query task
+        data = None
+
         if hasattr(self, 'apply'):
             try:
-                self.apply(**self.params)
+                data = self.apply(nodes=self.required_nodes, **self.params)
             except (QueryErrors, ActionErrors) as e:
                 return e.for_json()
+
+        data = {} if data is None else data
 
         for node_name, fields in self.required_nodes.items():
             node = getattr(self, node_name).copy()
@@ -107,7 +110,7 @@ class Query(Members):
             node_name = self.transform(node_name)
 
             try:
-                result = node.resolve(self, fields)
+                result = node.resolve(self, fields=fields, **data)
             except NodeIsNull:
                 result = None
             except (QueryErrors, ActionErrors) as e:
@@ -121,4 +124,7 @@ class Query(Members):
             return out
 
     def copy(self):
-        return self.__class__(plugins=self.plugins, callback=self.callback)
+        cls = self.__class__(plugins=self.plugins, callback=self.callback)
+        cls._transform_keys = self._transform_keys
+
+        return cls

@@ -44,6 +44,5 @@ class Field(object):
                               default=self.default,
                               cast=self.cast)
 
-    def resolve(self, node):
-        self.clear()
-        return self.set_value(self.resolver(self, node))
+    def resolve(self, query=None, node=None, **data):
+        return self.set_value(self.resolver(query=query, node=node, **data))

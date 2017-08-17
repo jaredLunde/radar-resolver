@@ -61,7 +61,7 @@ class Radar(object):
             query.transform_keys(self.transform_keys)
 
             if query_requires:
-                query.require(**query_requires)
+                query = query.copy().require(**query_requires)
 
             result = query.resolve(**query_params)
         except QueryError as e:
@@ -81,7 +81,7 @@ class Radar(object):
         action.transform_keys(self.transform_keys)
 
         if action_requires:
-            action.require(**action_requires)
+            action.copy().require(**action_requires)
 
         return action.resolve(**action_input)
 
