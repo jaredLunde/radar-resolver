@@ -22,8 +22,6 @@ class Query(Members):
         self.nodes = []
         self.plugins =[]
         self.node_names = []
-        self.params = {}
-        self.required_nodes = None
         self.install(*plugins or [])
         self._transform_keys = None
         self._compile()
@@ -62,6 +60,8 @@ class Query(Members):
             plugin(self, **params)
 
     def get_required_nodes(self, nodes):
+        rn = {}
+
         if nodes:
             for node_name, fields in nodes.items():
                 node_name = self.transform(node_name, False)
@@ -73,38 +73,36 @@ class Query(Members):
                     raise QueryError(f'Node `{node_name}` not found in '
                                      f'Query `{self.__NAME__}`.')
 
-                yield (node_name, node.get_required_fields(fields))
+                rn[node_name] = node.get_required_fields(fields)
         else:
             for node_name in self.node_names:
                 node_name = self.transform(node_name, False)
                 node = getattr(self, node_name).copy()
                 node.transform_keys(self._transform_keys)
-                yield (node_name, node.get_required_fields())
+                rn[node_name] = node.get_required_fields()
 
-    def require(self, **nodes):
-        self.required_nodes = dict(self.get_required_nodes(nodes))
-        return self
+        return rn
 
-    def resolve(self, **params):
+    def resolve(self, nodes=None, **params):
         out = {}
-        self.params = transform_deep_keys(params, self._transform_keys)
-        self.required_nodes = self.required_nodes or \
-                              dict(self.get_required_nodes({}))
+        params = transform_deep_keys(params, self._transform_keys)
+        required_nodes = self.get_required_nodes(nodes or {})
+
         #: Execute local plugins
-        self.execute_plugins(fields=self.required_nodes, **self.params)
+        self.execute_plugins(nodes=required_nodes.copy(), **params)
         #: Executes the apply function which is meant to perform the actual
         #  query task
         data = None
 
         if hasattr(self, 'apply'):
             try:
-                data = self.apply(nodes=self.required_nodes, **self.params)
+                data = self.apply(nodes=required_nodes.copy(), **params)
             except (QueryErrors, ActionErrors) as e:
                 return e.for_json()
 
         data = {} if data is None else data
 
-        for node_name, fields in self.required_nodes.items():
+        for node_name, fields in required_nodes.items():
             node = getattr(self, node_name).copy()
             node.transform_keys(self._transform_keys)
             node_name = self.transform(node_name)

@@ -52,7 +52,7 @@ class Radar(object):
         return self.actions[action_name].copy()
 
     def resolve_query(self, query_data):
-        query_requires = query_data.get('requires')
+        query_requires = query_data.get('requires', {})
         query_params = query_data.get('params', {})
         query = self.get_query(query_data['type'])
         result = None
@@ -60,10 +60,7 @@ class Radar(object):
         try:
             query.transform_keys(self.transform_keys)
 
-            if query_requires:
-                query = query.copy().require(**query_requires)
-
-            result = query.resolve(**query_params)
+            result = query.resolve(nodes=query_requires, **query_params)
         except QueryError as e:
             result[query.__NAME__] = str(e)
         except Exception as e:
@@ -80,10 +77,7 @@ class Radar(object):
         action = self.get_action(action_data['type'])
         action.transform_keys(self.transform_keys)
 
-        if action_requires:
-            action.copy().require(**action_requires)
-
-        return action.resolve(**action_input)
+        return action.resolve(nodes=action_requires, **action_input)
 
     def resolve(self, operations, is_json=True):
         operations = json.loads(operations) if is_json else operations

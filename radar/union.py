@@ -25,30 +25,43 @@ class Union(Node):
     def nodes(self):
         return self._fields
 
-    @property
-    def node_type(self):
-        raise TypeError('Unions require a `node_type` property which '
+    def get_node_type(self, *args, **kwargs):
+        raise TypeError('Unions require a `get_node_type` method which '
                         'returns a string specifying the proper Node to '
-                        'resolve for each iteration.')
+                        'resolve for each resolution.')
 
     def get_field(self, field_name):
         field = getattr(self, field_name)
 
         if isinstance(field, Node):
-            return field.set_parent(self.parent)
+            return field
 
         raise FieldNotFound(f'Field named `{field_name}` was not found in '
                             f'Node `{self.__NAME__}`')
 
-    def resolve_fields(self, fields={}):
-        node_type = self.node_type
-        result = self.resolve_field(node_type, fields.get(node_type))
+    def resolve_fields(self, query, fields, node=None, **data):
+        fields = fields or {}
+        node_type = self.get_node_type(query=query, fields=fields, **data)
+
+        if node_type is None:
+            raise TypeError('Unions must return a string from their '
+                            '`get_node_type` method specifying the proper Node'
+                            'to resolve for each resolution. Check the '
+                            f'`get_node_type` method of {self.__class__.__name__}')
+
+
+        result = self.resolve_field(
+            query,
+            node_type,
+            fields.get(node_type),
+            **data
+        )
         result['@union'] = self.transform(node_type)
 
         return result
 
-    def _resolve(self, fields):
-        out = self.resolve_fields(fields)
+    def _resolve(self, query, fields, index=None, **data):
+        out = self.resolve_fields(query, fields, index=index, **data)
 
         try:
             return self.callback(self, out)

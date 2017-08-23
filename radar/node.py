@@ -1,5 +1,5 @@
 import json
-from vital.debug import preprX
+from vital.debug import preprX, colorize, bold
 
 from radar.fields import Field, Obj
 from radar.exceptions import FieldNotFound, NodeKeyError, NodeIsNull
@@ -179,15 +179,12 @@ class Node(Interface):
             self.resolve_field(query, self._key.__NAME__, index=index, **data)
 
         out['@key'] = self.key
-        print(json.dumps(out, indent=2))
+        print(f'\n\n{colorize("[𝚁𝙴𝚂𝙾𝙻𝚅𝙴𝙳]", "green")}\n{colorize(query.__NAME__)} -> {bold(self.__NAME__)}',
+              json.dumps(out, indent=2))
         try:
             return self.callback(self, out)
         except TypeError:
             return out
-
-    def _set_index(self, index):
-        self.index = index
-        return self
 
     def _resolve_many(self, query, fields, index=None, **data):
         index = 0
@@ -196,7 +193,7 @@ class Node(Interface):
         for node in self:
             try:
                 append_out(
-                    node._set_index(index)._resolve(
+                    node.copy()._resolve(
                         query,
                         fields,
                         index=index,
@@ -211,7 +208,7 @@ class Node(Interface):
 
     def resolve(self, query, fields, index=None, **data):
         self.transform_keys(query._transform_keys)
-        
+
         if self.many:
             resolver = self._resolve_many
         else:

@@ -30,6 +30,8 @@ class Field(object):
             raise ValueError(f'Field `{self.__NAME__}` cannot be null.')
         elif value is None and self.default is not None:
             self.value = self.default
+        else:
+            self.value = None
 
         return self.value
 
