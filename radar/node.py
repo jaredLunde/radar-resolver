@@ -165,6 +165,12 @@ class Node(Interface):
 
     def _resolve(self, query, fields, index=None, **data):
         data = self.apply(query, fields, index=index, **data) or {}
+
+        if not isinstance(data, dict):
+            raise TypeError('Data returned by `apply` methods must be of type'
+                            f'`dict`. "{data}" is not a dict in Node: '
+                            f'{self.__class__.__name__}')
+
         out = {
             self.transform(name): value
             for name, value in self.resolve_fields(
@@ -179,8 +185,8 @@ class Node(Interface):
             self.resolve_field(query, self._key.__NAME__, index=index, **data)
 
         out['@key'] = self.key
-        print(f'\n\n{colorize("[𝚁𝙴𝚂𝙾𝙻𝚅𝙴𝙳]", "green")}\n{colorize(query.__NAME__)} -> {bold(self.__NAME__)}',
-              json.dumps(out, indent=2))
+        #print(f'\n\n{colorize("[𝚁𝙴𝚂𝙾𝙻𝚅𝙴𝙳]", "green")}\n{colorize(query.__NAME__)} -> {bold(self.__NAME__)}',
+        #      json.dumps(out, indent=2))
         try:
             return self.callback(self, out)
         except TypeError:
