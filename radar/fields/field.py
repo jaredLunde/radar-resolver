@@ -10,7 +10,7 @@ def _cast(x):
 
 class Field(object):
 
-    def __init__(self, resolver, key=False, not_null=False, default=None,
+    def __init__(self, resolver=None, key=False, not_null=False, default=None,
                  cast=None):
         """ @key: Universally unique field which identifies your Schema """
         self.resolver = resolver
@@ -35,6 +35,13 @@ class Field(object):
 
         return self.value
 
+    def default_resolver(self, query=None, node=None, **data):
+        try:
+            return data[self.__NAME__]
+        except KeyError:
+            raise KeyError(f'Key `{field_name}` not found in Node'
+                           f'`{self.__NAME__}` containing `{data}`')
+
     def clear(self):
         self.value = None
         return self
@@ -47,4 +54,5 @@ class Field(object):
                               cast=self.cast)
 
     def resolve(self, query=None, node=None, **data):
-        return self.set_value(self.resolver(query=query, node=node, **data))
+        resolver = self.resolver or self.default_resolver
+        return self.set_value(resolver(query=query, node=node, **data))
