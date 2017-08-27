@@ -8,7 +8,7 @@ def obj_resolver(obj_field):
     def resolver(query=None, node=None, fields=None, **data):
         fields = fields or []
         return obj_field.set_value({
-            transform_keys(field.name, node._transform_keys):
+            transform_keys(field.__NAME__, node._transform_keys):
                 field.resolve(query=query, node=node, fields=fields, **data)
             for field in obj_field.get_fields(*fields)
         })
@@ -16,6 +16,7 @@ def obj_resolver(obj_field):
 
 
 class Obj(Field, Members):
+    __slots__ = Field.__slots__ + ['fields']
 
     def __init__(self, not_null=False, default=None, cast=None):
         cast = cast or dict
@@ -33,7 +34,7 @@ class Obj(Field, Members):
         for field_name, field in self._getmembers():
             if isinstance(field, Field):
                 field = field.copy()
-                field.name = field_name
+                field.__NAME__ = field_name
                 add_field(field)
                 set_field(field_name, field)
 
@@ -48,7 +49,7 @@ class Obj(Field, Members):
                     yield field
                 else:
                     raise FieldNotFound(f'Field "{field}" was not found in '
-                                        f'the object "{self.name}"')
+                                        f'the object "{self.__NAME__}"')
 
     def resolve(self, query=None, **data):
         return self.set_value(self.resolver(query=query, **data))

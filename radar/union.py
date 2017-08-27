@@ -61,6 +61,13 @@ class Union(Node):
         return result
 
     def _resolve(self, query, fields, index=None, **data):
+        data = self.apply(query, fields, index=index, **data) or {}
+
+        if not isinstance(data, dict):
+            raise TypeError('Data returned by `apply` methods must be of type'
+                            f'`dict`. "{data}" is not a dict in Node: '
+                            f'{self.__class__.__name__}')
+
         out = self.resolve_fields(query, fields, index=index, **data)
 
         try:

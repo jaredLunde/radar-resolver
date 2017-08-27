@@ -9,6 +9,7 @@ def _cast(x):
 
 
 class Field(object):
+    __slots__ = ['key', 'value', 'cast', 'resolver', 'not_null', 'default', '__NAME__']
 
     def __init__(self, resolver=None, key=False, not_null=False, default=None,
                  cast=None):
@@ -39,8 +40,9 @@ class Field(object):
         try:
             return data[self.__NAME__]
         except KeyError:
-            raise KeyError(f'Key `{field_name}` not found in Node'
-                           f'`{self.__NAME__}` containing `{data}`')
+            raise KeyError(f'Key `{self.__NAME__}` not found in Node '
+                           f'`{node.__NAME__}` of Query `{query.__NAME__}` '
+                           f'containing `{data}`')
 
     def clear(self):
         self.value = None

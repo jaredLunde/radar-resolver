@@ -196,10 +196,10 @@ class Node(Interface):
         index = 0
         out = []
         append_out = out.append
-        for node in self:
+        while True:
             try:
                 append_out(
-                    node.copy()._resolve(
+                    self.copy()._resolve(
                         query,
                         fields,
                         index=index,

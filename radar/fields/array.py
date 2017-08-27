@@ -2,6 +2,7 @@ from radar.fields.field import Field
 
 
 class Array(Field):
+    __slots__ = Field.__slots__
 
     def __init__(self, resolver=None, not_null=False, default=None, cast=None):
         cast = cast or str
