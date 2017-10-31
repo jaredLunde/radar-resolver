@@ -64,8 +64,7 @@ class Node(Interface):
 
         return self
 
-    @property
-    def key(self):
+    def get_key(self):
         if self._key.value is not None:
             return self._key.value
 
@@ -184,7 +183,7 @@ class Node(Interface):
         if self._key.__NAME__ not in fields:
             self.resolve_field(query, self._key.__NAME__, index=index, **data)
 
-        out['@key'] = self.key
+        out['@key'] = self.get_key()
         #print(f'\n\n{colorize("[𝚁𝙴𝚂𝙾𝙻𝚅𝙴𝙳]", "green")}\n{colorize(query.__NAME__)} -> {bold(self.__NAME__)}',
         #      json.dumps(out, indent=2))
         try:
