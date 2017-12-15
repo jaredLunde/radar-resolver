@@ -50,13 +50,15 @@ class Union(Node):
                             f'`get_node_type` method of {self.__class__.__name__}')
 
 
-        result = self.resolve_field(
-            query,
-            node_type,
-            fields.get(node_type),
-            **data
-        )
-        result['@union'] = self.transform(node_type)
+        result = {
+            self.transform(node_type): self.resolve_field(
+                query,
+                node_type,
+                fields.get(node_type),
+                **data
+            )
+        }
+        # result['@union'] = self.transform(node_type)
 
         return result
 

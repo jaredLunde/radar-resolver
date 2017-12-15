@@ -183,7 +183,8 @@ class Node(Interface):
         if self._key.__NAME__ not in fields:
             self.resolve_field(query, self._key.__NAME__, index=index, **data)
 
-        out['@key'] = self.get_key()
+        out[self._key.__NAME__] = self.get_key()
+        #out['@key'] = self.get_key()
         #print(f'\n\n{colorize("[𝚁𝙴𝚂𝙾𝙻𝚅𝙴𝙳]", "green")}\n{colorize(query.__NAME__)} -> {bold(self.__NAME__)}',
         #      json.dumps(out, indent=2))
         try:
