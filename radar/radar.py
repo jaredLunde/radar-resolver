@@ -77,7 +77,7 @@ class Radar(object):
         action = self.get_action(action_data['name'])
         action.transform_keys(self.transform_keys)
         result = {}
-        
+
         try:
             result = action.resolve(nodes=action_requires, **action_input)
         except (QueryError, ActionError, ActionError, QueryErrors):
@@ -85,6 +85,8 @@ class Radar(object):
         except Exception as e:
             if self.raises:
                 raise e
+
+        return result
 
     def resolve(self, operations, is_json=True):
         operations = json.loads(operations) if is_json else operations

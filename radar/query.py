@@ -20,7 +20,7 @@ class Query(Members):
                         self.__class__.__name__
         self.callback = callback
         self.nodes = []
-        self.plugins =[]
+        self.plugins = []
         self.node_names = []
         self.install(*plugins or [])
         self._transform_keys = None
