@@ -3,7 +3,7 @@ try:
 except ImportError:
     import json
 
-from radar.exceptions import QueryError, ActionError, OperationNotFound
+from radar.exceptions import QueryError, ActionError, ActionError, QueryErrors, OperationNotFound
 
 
 class Radar(object):
@@ -52,17 +52,17 @@ class Radar(object):
         return self.actions[action_name].copy()
 
     def resolve_query(self, query_data):
-        query_requires = query_data.get('requires', {})
-        query_params = query_data.get('params', {})
-        query = self.get_query(query_data['type'])
-        result = None
+        query_requires = query_data.get('contains', {})
+        query_params = query_data.get('props', {})
+        query = self.get_query(query_data['name'])
+        result = {}
 
         try:
             query.transform_keys(self.transform_keys)
-
             result = query.resolve(nodes=query_requires, **query_params)
-        except QueryError as e:
-            result[query.__NAME__] = str(e)
+        except (QueryError, ActionError, ActionError, QueryErrors):
+            # result[query.__NAME__] = str(e)
+            result[query.__NAME__] = None
         except Exception as e:
             if self.raises:
                 raise e
@@ -72,12 +72,19 @@ class Radar(object):
         return result
 
     def resolve_action(self, action_data):
-        action_input = action_data.get('input', {})
-        action_requires = action_data.get('requires', {})
-        action = self.get_action(action_data['type'])
+        action_input = action_data.get('props', {})
+        action_requires = action_data.get('contains', {})
+        action = self.get_action(action_data['name'])
         action.transform_keys(self.transform_keys)
-
-        return action.resolve(nodes=action_requires, **action_input)
+        result = {}
+        
+        try:
+            result = action.resolve(nodes=action_requires, **action_input)
+        except (QueryError, ActionError, ActionError, QueryErrors):
+            result[action.__NAME__] = None
+        except Exception as e:
+            if self.raises:
+                raise e
 
     def resolve(self, operations, is_json=True):
         operations = json.loads(operations) if is_json else operations
@@ -86,9 +93,9 @@ class Radar(object):
         add_out = out.append
 
         for operation in operations:
-            if operation['type'] in self.queries:
+            if operation['name'] in self.queries:
                 add_out(self.resolve_query(operation))
-            elif operation['type'] in self.actions:
+            elif operation['name'] in self.actions:
                 add_out(self.resolve_action(operation))
             else:
                 raise OperationNotFound('An action or query with the name '

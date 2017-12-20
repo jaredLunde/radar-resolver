@@ -6,11 +6,11 @@ from radar.exceptions import QueryError, QueryErrors, ActionErrors, NodeIsNull
 from radar.utils import transform_keys
 
 
-def transform_deep_keys(params, do_transform=True):
+def transform_deep_keys(props, do_transform=True):
     return {transform_keys(key, do_transform, False):
             (val if not isinstance(val, dict) else
              transform_deep_keys(val, do_transform))
-            for key, val in params.items()}
+            for key, val in props.items()}
 
 
 class Query(Members):
@@ -55,9 +55,9 @@ class Query(Members):
     def install(self, *plugins):
         self.plugins.extend(plugins)
 
-    def execute_plugins(self, **params):
+    def execute_plugins(self, **props):
         for plugin in self.plugins:
-            plugin(self, **params)
+            plugin(self, **props)
 
     def get_required_nodes(self, nodes):
         rn = {}
@@ -83,22 +83,24 @@ class Query(Members):
 
         return rn
 
-    def resolve(self, nodes=None, **params):
+    def resolve(self, nodes=None, **props):
         out = {}
-        params = transform_deep_keys(params, self._transform_keys)
+        props = transform_deep_keys(props, self._transform_keys)
         required_nodes = self.get_required_nodes(nodes or {})
 
         #: Execute local plugins
-        self.execute_plugins(nodes=required_nodes.copy(), **params)
+        self.execute_plugins(nodes=required_nodes.copy(), **props)
         #: Executes the apply function which is meant to perform the actual
         #  query task
         data = None
 
         if hasattr(self, 'apply'):
-            try:
-                data = self.apply(nodes=required_nodes.copy(), **params)
+            data = self.apply(nodes=required_nodes.copy(), **props)
+            '''try:
+                data = self.apply(nodes=required_nodes.copy(), **props)
             except (QueryErrors, ActionErrors) as e:
-                return e.for_json()
+                return None
+                return e.for_json()'''
 
         data = {} if data is None else data
 
@@ -111,8 +113,9 @@ class Query(Members):
                 result = node.resolve(self, fields=fields, **data)
             except NodeIsNull:
                 result = None
-            except (QueryErrors, ActionErrors) as e:
-                return e.for_json()
+            #except (QueryErrors, ActionErrors) as e:
+            #    return None
+                # return e.for_json()
 
             out[node_name] = result
 
