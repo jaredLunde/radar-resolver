@@ -62,12 +62,10 @@ class Radar(object):
             result = query.resolve(nodes=query_requires, **query_params)
         except (QueryError, ActionError, ActionError, QueryErrors):
             # result[query.__NAME__] = str(e)
-            result[query.__NAME__] = None
+            result = None
         except Exception as e:
             if self.raises:
                 raise e
-
-            result = {'error': 'An uncaught error occurred.'}
 
         return result
 
@@ -81,7 +79,7 @@ class Radar(object):
         try:
             result = action.resolve(nodes=action_requires, **action_input)
         except (QueryError, ActionError, ActionError, QueryErrors):
-            result[action.__NAME__] = None
+            result = None
         except Exception as e:
             if self.raises:
                 raise e
@@ -95,7 +93,9 @@ class Radar(object):
         add_out = out.append
 
         for operation in operations:
-            if operation['name'] in self.queries:
+            if operation is None:
+                add_out(None)
+            elif operation['name'] in self.queries:
                 add_out(self.resolve_query(operation))
             elif operation['name'] in self.actions:
                 add_out(self.resolve_action(operation))
