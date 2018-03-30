@@ -2,23 +2,23 @@ import json
 from vital.debug import preprX, colorize, bold
 
 from radar.fields import Field, Obj
-from radar.exceptions import FieldNotFound, NodeKeyError, NodeIsNull
+from radar.exceptions import FieldNotFound, RecordKeyError, RecordIsNull
 from radar.members import Members
 from radar.interface import Interface
 from radar.utils import to_js_keys, transform_keys, to_js_shape
 
 
-JS_TPL = '''import {{createNode}} from 'react-radar'{imports}
+JS_TPL = '''import {{createRecord}} from 'react-radar'{imports}
 
 
-export default createNode({{
+export default createRecord({{
   name: '{name}',
   implements: {interfaces},
   fields: {shape}
 }})'''
 
 
-class Node(Interface):
+class Record(Interface):
 
     def __init__(self, callback=None, many=False):
         """ @many: will return #list if @many is |True|
@@ -39,7 +39,7 @@ class Node(Interface):
         self.implement(*self.implements)
 
         if self._key is None:
-            raise NodeKeyError(f'Node `{self.__NAME__}` does not have a '
+            raise RecordKeyError(f'Record `{self.__NAME__}` does not have a '
                                  'designated key but requires one.')
 
     def transform_keys(self, truthy_falsy=None):
@@ -68,22 +68,22 @@ class Node(Interface):
         if self._key.value is not None:
             return self._key.value
 
-        raise NodeKeyError(f'Node `{self.__NAME__}` did not have a Key field '
+        raise RecordKeyError(f'Record `{self.__NAME__}` did not have a Key field '
                            'with a value. Your Key field cannot ever return '
                            'None.')
 
     def get_field(self, field_name):
         field = getattr(self, field_name)
 
-        if isinstance(field, (Field, Node)):
+        if isinstance(field, (Field, Record)):
             return field
 
         raise FieldNotFound(f'Field named `{field_name}` was not found in '
-                            f'Node `{self.__NAME__}`')
+                            f'Record `{self.__NAME__}`')
 
     def get_required_field(self, field, child_fields=None):
         fields = {}
-        if isinstance(field, Node):
+        if isinstance(field, Record):
             fields[field.__NAME__] = field.get_required_fields(child_fields)
         elif isinstance(field, Obj):
             fields[field.__NAME__] = {
@@ -118,29 +118,29 @@ class Node(Interface):
         field = self.get_field(self.transform(field_name, False))
 
 
-        if isinstance(field, Node):
+        if isinstance(field, Record):
             field = field.copy()
             try:
                 return field.copy().resolve(
                     query=query,
-                    node=self,
+                    record=self,
                     fields=sub_fields,
                     **data
                 )
-            except NodeIsNull:
+            except RecordIsNull:
                 return None
         else:
             if sub_fields is None:
                 return field.resolve(
                     query=query,
-                    node=self,
+                    record=self,
                     fields=None,
                     **data
                 )
 
             return field.resolve(
                 query=query,
-                node=self,
+                record=self,
                 fields=sub_fields,
                 **data
             )
@@ -167,7 +167,7 @@ class Node(Interface):
 
         if not isinstance(data, dict):
             raise TypeError('Data returned by `apply` methods must be of type'
-                            f'`dict`. "{data}" is not a dict in Node: '
+                            f'`dict`. "{data}" is not a dict in Record: '
                             f'{self.__class__.__name__}')
 
         out = {
@@ -248,10 +248,10 @@ class Node(Interface):
             )
             interface_names.append(interface.__NAME__)
 
-        nodes = [node for node in self.fields if isinstance(node, Node)]
+        records = [record for record in self.fields if isinstance(record, Record)]
 
         for field in self._fields:
-            if isinstance(field, Node):
+            if isinstance(field, Record):
                 shape[self.transform(field.__NAME__)] =\
                     f'{field.__class__.__name__}.fields'
             elif field.__NAME__ not in interface_fields:
@@ -271,8 +271,8 @@ class Node(Interface):
         ]
 
         imports.extend(
-            f"import {node.__class__().__NAME__} from './{node.__class__().__NAME__}'"
-            for node in self.fields if isinstance(node, Node)
+            f"import {record.__class__().__NAME__} from './{record.__class__().__NAME__}'"
+            for record in self.fields if isinstance(record, Record)
         )
 
         output = JS_TPL.format(

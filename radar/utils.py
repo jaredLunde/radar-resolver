@@ -7,11 +7,11 @@ __all__ = ('to_js_keys', 'transform_keys', 'to_js_shape')
 
 
 js_keys_re = re.compile(r"""([^\\])"([A-Za-z]+[A-Za-z0-9_]*?)":""")
-js_nodes_re = re.compile(r"""(:\s*)(")([A-Za-z0-9_]*?.fields)(")""")
+js_records_re = re.compile(r"""(:\s*)(")([A-Za-z0-9_]*?.fields)(")""")
 
 
 def to_js_keys(output):
-    return js_nodes_re.sub(r'\1\3', js_keys_re.sub(r'\1\2:', output))
+    return js_records_re.sub(r'\1\3', js_keys_re.sub(r'\1\2:', output))
 
 
 def to_snake(key):

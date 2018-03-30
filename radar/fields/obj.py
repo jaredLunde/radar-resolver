@@ -5,11 +5,11 @@ from radar.utils import transform_keys
 
 
 def obj_resolver(obj_field):
-    def resolver(query=None, node=None, fields=None, **data):
+    def resolver(query=None, record=None, fields=None, **data):
         fields = fields or []
         return obj_field.set_value({
-            transform_keys(field.__NAME__, node._transform_keys):
-                field.resolve(query=query, node=node, fields=fields, **data)
+            transform_keys(field.__NAME__, record._transform_keys):
+                field.resolve(query=query, record=record, fields=fields, **data)
             for field in obj_field.get_fields(*fields)
         })
     return resolver

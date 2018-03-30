@@ -59,7 +59,7 @@ class Radar(object):
 
         try:
             query.transform_keys(self.transform_keys)
-            result = query.resolve(nodes=query_requires, **query_params)
+            result = query.resolve(records=query_requires, **query_params)
         except (QueryError, ActionError, ActionError, QueryErrors):
             # result[query.__NAME__] = str(e)
             result = None
@@ -77,7 +77,7 @@ class Radar(object):
         result = {}
 
         try:
-            result = action.resolve(nodes=action_requires, **action_input)
+            result = action.resolve(records=action_requires, **action_input)
         except (QueryError, ActionError, ActionError, QueryErrors):
             result = None
         except Exception as e:

@@ -36,12 +36,12 @@ class Field(object):
 
         return self.value
 
-    def default_resolver(self, query=None, node=None, **data):
+    def default_resolver(self, query=None, record=None, **data):
         try:
             return data[self.__NAME__]
         except KeyError:
-            raise KeyError(f'Key `{self.__NAME__}` not found in Node '
-                           f'`{node.__NAME__}` of Query `{query.__NAME__}` '
+            raise KeyError(f'Key `{self.__NAME__}` not found in Record '
+                           f'`{record.__NAME__}` of Query `{query.__NAME__}` '
                            f'containing `{data}`')
 
     def clear(self):
@@ -55,6 +55,6 @@ class Field(object):
                               default=self.default,
                               cast=self.cast)
 
-    def resolve(self, query=None, node=None, **data):
+    def resolve(self, query=None, record=None, **data):
         resolver = self.resolver or self.default_resolver
-        return self.set_value(resolver(query=query, node=node, **data))
+        return self.set_value(resolver(query=query, record=record, **data))

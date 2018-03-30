@@ -2,7 +2,7 @@ class FieldNotFound(Exception):
     pass
 
 
-class NodeKeyError(Exception):
+class RecordKeyError(Exception):
     pass
 
 
@@ -31,7 +31,7 @@ class ActionErrors(QueryErrors):
     pass
 
 
-class NodeIsNull(Exception):
+class RecordIsNull(Exception):
     pass
 
 
