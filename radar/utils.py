@@ -1,5 +1,6 @@
 import re
 import json
+from vital.cache import memoize
 from vital.tools import strings as string_tools
 
 
@@ -14,6 +15,12 @@ def to_js_keys(output):
     return js_records_re.sub(r'\1\3', js_keys_re.sub(r'\1\2:', output))
 
 
+@memoize
+def camel_to_underscore(key):
+    return string_tools.camel_to_underscore(key)
+
+
+@memoize
 def to_snake(key):
     camel = list(string_tools.underscore_to_camel(key))
     next_char = 0
@@ -36,7 +43,7 @@ def to_snake(key):
 
 def transform_keys(key, truthy_falsy, to_js=True):
     # print(repr(key))
-    if truthy_falsy:
+    if truthy_falsy is True:
         camel = string_tools.camel_to_underscore(key) if to_js is False else\
                 to_snake(key)
 

@@ -67,7 +67,8 @@ class Query(Members):
                 record_name = self.transform(record_name, False)
 
                 try:
-                    record = getattr(self, record_name).copy()
+                    # record = getattr(self, record_name).copy()
+                    record = getattr(self, record_name)
                     record.transform_keys(self._transform_keys)
                 except AttributeError:
                     raise QueryError(f'Record `{record_name}` not found in '
@@ -77,7 +78,8 @@ class Query(Members):
         else:
             for record_name in self.record_names:
                 record_name = self.transform(record_name, False)
-                record = getattr(self, record_name).copy()
+                # record = getattr(self, record_name).copy()
+                record = getattr(self, record_name)
                 record.transform_keys(self._transform_keys)
                 rn[record_name] = record.get_required_fields()
 
@@ -89,23 +91,19 @@ class Query(Members):
         required_records = self.get_required_records(records or {})
 
         #: Execute local plugins
-        self.execute_plugins(records=required_records.copy(), **props)
+        self.execute_plugins(records=required_records, **props)
         #: Executes the apply function which is meant to perform the actual
         #  query task
         data = None
 
         if hasattr(self, 'apply'):
-            data = self.apply(records=required_records.copy(), **props)
-            '''try:
-                data = self.apply(records=required_records.copy(), **props)
-            except (QueryErrors, ActionErrors) as e:
-                return None
-                return e.for_json()'''
+            data = self.apply(required_records, **props)
 
         data = {} if data is None else data
 
         for record_name, fields in required_records.items():
-            record = getattr(self, record_name).copy()
+            # record = getattr(self, record_name).copy()
+            record = getattr(self, record_name)
             record.transform_keys(self._transform_keys)
             record_name = self.transform(record_name)
 
@@ -113,9 +111,6 @@ class Query(Members):
                 result = record.resolve(self, fields=fields, **data)
             except RecordIsNull:
                 result = None
-            #except (QueryErrors, ActionErrors) as e:
-            #    return None
-                # return e.for_json()
 
             out[record_name] = result
 

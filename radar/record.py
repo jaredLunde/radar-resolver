@@ -64,14 +64,6 @@ class Record(Interface):
 
         return self
 
-    def get_key(self):
-        if self._key.value is not None:
-            return self._key.value
-
-        raise RecordKeyError(f'Record `{self.__NAME__}` did not have a Key field '
-                           'with a value. Your Key field cannot ever return '
-                           'None.')
-
     def get_field(self, field_name):
         field = getattr(self, field_name)
 
@@ -109,8 +101,7 @@ class Record(Interface):
             for field_name, child_fields in input_fields.items():
                 field_name = self.transform(field_name, False)
                 field = self.get_field(field_name)
-                required_fields = self.get_required_field(field, child_fields)
-                fields.update(required_fields)
+                fields.update(self.get_required_field(field, child_fields))
 
         return fields
 
@@ -119,31 +110,22 @@ class Record(Interface):
 
 
         if isinstance(field, Record):
-            field = field.copy()
             try:
-                return field.copy().resolve(
-                    query=query,
-                    record=self,
-                    fields=sub_fields,
-                    **data
-                )
+                # return field.copy().resolve(
+                #     query=query,
+                #     record=self,
+                #     fields=sub_fields,
+                #     **data
+                # )
+                # return field.resolve(query, self, fields=sub_fields, **data)
+                return field.resolve(query, fields=sub_fields, **data)
             except RecordIsNull:
                 return None
         else:
             if sub_fields is None:
-                return field.resolve(
-                    query=query,
-                    record=self,
-                    fields=None,
-                    **data
-                )
+                return field.resolve(query, self, fields=None, **data)
 
-            return field.resolve(
-                query=query,
-                record=self,
-                fields=sub_fields,
-                **data
-            )
+            return field.resolve(query, self, fields=sub_fields, **data)
 
     def transform(self, field_name, to_js=True):
         return transform_keys(field_name, self._transform_keys, to_js)
@@ -181,12 +163,19 @@ class Record(Interface):
         }
 
         if self._key.__NAME__ not in fields:
-            self.resolve_field(query, self._key.__NAME__, index=index, **data)
+            out[self._key.__NAME__] = self.resolve_field(
+                query,
+                self._key.__NAME__,
+                index=index,
+                **data
+            )
 
-        out[self._key.__NAME__] = self.get_key()
-        #out['@key'] = self.get_key()
-        #print(f'\n\n{colorize("[𝚁𝙴𝚂𝙾𝙻𝚅𝙴𝙳]", "green")}\n{colorize(query.__NAME__)} -> {bold(self.__NAME__)}',
-        #      json.dumps(out, indent=2))
+        if out[self._key.__NAME__] is None:
+            raise RecordKeyError(
+                f'Record `{self.__NAME__}` did not have a Key field '
+                'with a value. Your Key field cannot ever return None.'
+            )
+
         try:
             return self.callback(self, out)
         except TypeError:
@@ -196,18 +185,21 @@ class Record(Interface):
         index = 0
         out = []
         append_out = out.append
+
         while True:
             try:
                 append_out(
-                    self.copy()._resolve(
-                        query,
-                        fields,
-                        index=index,
-                        **data
-                    )
+                    # self.copy()._resolve(
+                    #     query,
+                    #     fields,
+                    #     index=index,
+                    #     **data
+                    # )
+                    self._resolve(query, fields, index=index, **data)
                 )
             except IndexError:
                 break
+
             index += 1
 
         return out
@@ -256,7 +248,6 @@ class Record(Interface):
                     f'{field.__class__.__name__}.fields'
             elif field.__NAME__ not in interface_fields:
                 if isinstance(field, Obj):
-                    # TODO
                     shape[self.transform(field.__NAME__)] = None
                 else:
                     shape[self.transform(field.__NAME__)] = None

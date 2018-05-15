@@ -9,7 +9,7 @@ def _cast(x):
 
 
 class Field(object):
-    __slots__ = ['key', 'value', 'cast', 'resolver', 'not_null', 'default', '__NAME__']
+    __slots__ = ['key', 'cast', 'resolver', 'not_null', 'default', '__NAME__']
 
     def __init__(self, resolver=None, key=False, not_null=False, default=None,
                  cast=None):
@@ -19,22 +19,20 @@ class Field(object):
         self.cast = cast or _cast
         self.default = default
         self.key = key
-        self.value = None
+        # self.value = None
         self.__NAME__ = None
 
     __repr__ = preprX('name', 'value', 'key', address=False)
 
-    def set_value(self, value=None):
+    def get_value(self, value=None):
         if value is not None:
-            self.value = self.cast(value)
+            return self.cast(value)
         elif value is None and self.default is None and self.not_null:
             raise ValueError(f'Field `{self.__NAME__}` cannot be null.')
         elif value is None and self.default is not None:
-            self.value = self.default
+            return self.default
         else:
-            self.value = None
-
-        return self.value
+            return None
 
     def default_resolver(self, query=None, record=None, **data):
         try:
@@ -44,9 +42,9 @@ class Field(object):
                            f'`{record.__NAME__}` of Query `{query.__NAME__}` '
                            f'containing `{data}`')
 
-    def clear(self):
-        self.value = None
-        return self
+    # def clear(self):
+    #     self.value = None
+    #     return self
 
     def copy(self):
         return self.__class__(self.resolver,
@@ -55,6 +53,6 @@ class Field(object):
                               default=self.default,
                               cast=self.cast)
 
-    def resolve(self, query=None, record=None, **data):
+    def resolve(self, query, record, **data):
         resolver = self.resolver or self.default_resolver
-        return self.set_value(resolver(query=query, record=record, **data))
+        return self.get_value(resolver(query=query, record=record, **data))
