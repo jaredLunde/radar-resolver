@@ -53,7 +53,7 @@ class Union(Record):
         if record_type is None:
             raise TypeError('Unions must return a string from their '
                             '`get_record_type` method specifying the proper Record'
-                            'to resolve for each resolution. Check the '
+                            'to resolve for each invocation. Check the '
                             f'`get_record_type` method of {self.__class__.__name__}')
 
         yield to_js_key(record_type), self.resolve_field(
@@ -63,8 +63,8 @@ class Union(Record):
             **context
         )
 
-    def _resolve(self, fields, state, **context):
-        state = self.reduce(state, fields=fields, **context) or {}
+    def _resolve(self, fields, state, index=None, **context):
+        state = self.reduce(state, fields=fields, index=index, **context) or {}
 
         if not isinstance(state, dict):
             raise TypeError('Data returned by `apply` methods must be of type'
@@ -77,6 +77,10 @@ class Union(Record):
             return self._callback(output, self)
         except TypeError:
             return output
+
+    # @staticmethod
+    # def reduce(state, **context):
+    #     return state
 
 '''
 from radar import Interface, Record, Query, Union, fields

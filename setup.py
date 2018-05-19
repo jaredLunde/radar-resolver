@@ -7,7 +7,7 @@ from pkgutil import walk_packages
 
 PKG = 'radar'
 PKG_NAME = 'radar-resolver'
-PKG_VERSION = '0.2.5'
+PKG_VERSION = '0.2.6'
 
 pathname = os.path.dirname(os.path.realpath(__file__))
 

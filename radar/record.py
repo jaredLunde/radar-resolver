@@ -121,8 +121,8 @@ class Record(Interface):
                     self.resolve_field(field.__NAME__, state, **context)
                 )
 
-    def _resolve(self, fields, state, **context):
-        state = self.reduce(state, fields=fields, **context) or {}
+    def _resolve(self, fields, state, index=None, **context):
+        state = self.reduce(state, fields=fields, index=index, **context) or {}
 
         if not isinstance(state, dict):
             raise TypeError('Data returned by `reduce` methods must be of type'
@@ -186,8 +186,11 @@ class Record(Interface):
         return self
 
     @staticmethod
-    def reduce(state, **context):
-        return state
+    def reduce(state, index=None, **context):
+        if index is None:
+            return state
+        else:
+            return state[index]
 
     def copy(self):
         cls = self.__class__(callback=self._callback, many=self._many)
