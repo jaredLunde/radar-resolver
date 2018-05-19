@@ -107,7 +107,6 @@ class Record(Interface):
     def resolve_field(self, query, field_name, sub_fields=None, **data):
         field = self.get_field(self.transform(field_name, False))
 
-
         if isinstance(field, Record):
             try:
                 # return field.copy().resolve(

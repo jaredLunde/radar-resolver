@@ -48,7 +48,7 @@ class Query(object, metaclass=MetaQuery):
 
     def __new__(cls, *a, **kw):
         query = super().__new__(cls)
-        query.__init__(query, *a, **kw)
+        query.__init__(*a, **kw)
         query.records = tuple(
             record
             for k, record in get_class_attrs(query.__class__)
@@ -91,8 +91,10 @@ class Query(object, metaclass=MetaQuery):
                     getattr(self, record.__NAME__).get_required_fields()
                 )
 
-    def resolve(self, records, **props):
-        required_records = self.get_required_records(transform_deep_keys(records) or {})
+    def resolve(self, records, props):
+        required_records = dict(
+            self.get_required_records(transform_deep_keys(records) or {})
+        )
 
         # executes the apply function which is meant to fetch the result of
         # the actual query task
@@ -100,7 +102,7 @@ class Query(object, metaclass=MetaQuery):
         state = {} if state is None else state
         output = {}
 
-        for record_name, fields in required_records:
+        for record_name, fields in required_records.items():
             try:
                 result = getattr(self, record_name).resolve(
                     fields,
@@ -158,8 +160,8 @@ class MyQueries(Query):
         return [{'foo': 'bar', 'bar': 1, 'baz': ['a', 'b'], 'boz': 1.0}, {'foo': 'bar', 'bar': 2, 'baz': ['c', 'd'], 'boz': 2.0}]
 
 
-MyQuery().resolve({'my': {'foo': None}})
-MyQueries().resolve({'my': {'foo': None}})
-Timer(MyQueries().resolve, records={'my': {'foo': None}}).time(1E4)
-Timer(MyQuery().resolve, records={'my': {}}).time(1E4)
+MyQuery().resolve({'my': {'foo': None}}, {})
+MyQueries().resolve({'my': {'foo': None}}, {})
+Timer(MyQueries().resolve, records={'my': {'foo': None}}, props={}).time(1E4)
+Timer(MyQuery().resolve, records={'my': {}}, props={}).time(1E4)
 '''

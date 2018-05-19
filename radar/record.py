@@ -30,7 +30,7 @@ class Record(Interface):
 
     def __new__(cls, *a, **kw):
         record = super().__new__(cls)
-        record.__init__(record, *a, **kw)
+        record.__init__(*a, **kw)
 
         if hasattr(record, 'implements'):
             fields = get_interface_fields(record)
@@ -53,23 +53,20 @@ class Record(Interface):
                             f'Record `{self.__NAME__}`')
 
     def get_required_field(self, field, child_fields=None):
-        fields = {}
-
         if isinstance(field, Record):
             yield field.__NAME__, field.get_required_fields(child_fields)
         elif isinstance(field, Obj):
-            if child_fields:
-                for child_field in field.fields:
-                    if child_fields and child_field.__NAME__ in child_fields:
-                        yield (
-                            child_field.__NAME__,
-                            self.get_required_field(
-                                child_field,
-                                child_fields[child_field.__NAME__]
-                                    if child_fields else
-                                    None
-                            )
-                        )
+            yield (
+                field.__NAME__,
+                {
+                    child_field.__NAME__: dict(self.get_required_field(
+                        child_field,
+                        child_fields[child_field.__NAME__] if child_fields else None
+                    ))
+                    for child_field in field.fields
+                    if child_fields and child_field.__NAME__ in child_fields
+                }
+            )
         else:
             yield field.__NAME__, None
 
@@ -137,15 +134,17 @@ class Record(Interface):
             for name, value in self.resolve_fields(fields, state, **context)
         }
 
-        if self._key.__NAME__ not in fields:
-            output[self._key.__NAME__] = self.resolve_field(
+        key_name = to_js_key(self._key.__NAME__)
+
+        if key_name not in fields:
+            output[key_name] = self.resolve_field(
                 self._key.__NAME__,
                 state,
                 fields=fields,
                 **context
             )
 
-        if output[self._key.__NAME__] is None:
+        if output[key_name] is None:
             raise RecordKeyError(
                 f'Record `{self.__NAME__}` did not have a Key field '
                 'with a value. Your Key field cannot ever return None.'
@@ -186,11 +185,9 @@ class Record(Interface):
 
         return self
 
-    def reduce(self, state, fields=None, query=None, index=None):
-        if index is not None:
-            return state[index]
-        else:
-            return state
+    @staticmethod
+    def reduce(state, **context):
+        return state
 
     def copy(self):
         cls = self.__class__(callback=self._callback, many=self._many)
@@ -210,15 +207,25 @@ class MySubInterface(MyInterface):
 MySubInterface()
 
 from vital.debug import Timer
-Timer(MySubInterface).time(1E5)
+Timer(MySubInterface).time(1E4)
 
 class MyRecord(Record):
     implements = [MySubInterface]
     boz = fields.Float()
 
 MyRecord()
-Timer(MyRecord).time(1E5)
+Timer(MyRecord).time(1E4)
 MyRecord.fields
 MyRecord().resolve({'foo': None}, {'foo': 'bar', 'bar': 'baz'})
-Timer(MyRecord().resolve, fields={'foo': None}, state={'foo': 'bar', 'bar': 'baz'}).time(1E5)
+Timer(MyRecord().resolve, fields={'foo': None}, state={'foo': 'bar', 'bar': 'baz'}).time(1E4)
+
+class MyNestedRecord(Record):
+    implements = [MySubInterface]
+    boz = fields.Float()
+
+class MyRecord(Record):
+    uid = fields.String(key=True)
+    nested = MyNestedRecord(many=True)
+
+MyRecord().resolve({'nested': {'foo': None}, 'uid': None}, {'nested': [{'foo': 'bar', 'bar': 'baz'}], 'uid': 1})
 '''

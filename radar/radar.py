@@ -12,36 +12,41 @@ from radar.exceptions import (
 )
 
 
+empty_dict = {}
+
 class Radar(object):
-
-    def __init__(self, queries=None, actions=None, raises=True,
-                 transform_keys=True):
-        """ @transform_keys: if |True|, transforms JS camelCase keys to Python
-                underscore_case and vice-versa
-        """
+    def __init__(self, queries=None, actions=None, raises=True):
         self.queries = {}
-        self.install_query(*queries or [])
         self.actions = {}
-        self.install_action(*actions or [])
+        if queries:
+            self.install_query(*queries)
+        if actions:
+            self.install_action(*actions)
         self.raises = raises
-        self.transform_keys = transform_keys
 
-    def __call__(self, data, is_json=True):
-        return self.resolve(data, is_json=is_json)
+    def __call__(self, state, is_json=True):
+        return self.resolve(state, is_json=is_json)
 
     def install_query(self, *queries):
-        self.queries.update({
-            query.__NAME__
-                if hasattr(query, '__NAME__') else query.__name__: query
-            for query in queries
-        })
+        for query in queries:
+            query_name = (
+                query.__NAME__
+                if hasattr(query, '__NAME__') else
+                query.__class__.__name__
+            )
+            query.__NAME__ = query_name
+            self.queries[query_name] = query
 
     def install_action(self, *actions):
-        self.actions.update({
-            action.__NAME__ if hasattr(action, '__NAME__') else action.__name__:
-                action
-            for action in actions or []
-        })
+        for action in actions:
+            action_name = (
+                action.__NAME__
+                if hasattr(action, '__NAME__') else
+                action.__class__.__name__
+            )
+            action.__NAME__ = action_name
+            self.actions[action_name] = action
+
 
     def remove_query(self, *queries):
         for query in queries:
@@ -52,22 +57,20 @@ class Radar(object):
             del self.actions[action.name]
 
     def get_query(self, query_name):
-        return self.queries[query_name].copy()
+        return self.queries[query_name]
 
     def get_action(self, action_name):
-        return self.actions[action_name].copy()
+        return self.actions[action_name]
 
     def resolve_query(self, query_data):
-        query_requires = query_data.get('contains', {})
-        query_params = query_data.get('props', {})
+        query_requires = query_data.get('contains', empty_dict)
+        query_params = query_data.get('props', empty_dict)
         query = self.get_query(query_data['name'])
         result = {}
 
         try:
-            query.transform_keys(self.transform_keys)
-            result = query.resolve(query_requires, **query_params)
+            result = query.resolve(query_requires, query_params)
         except (QueryError, ActionError, ActionError, QueryErrors):
-            # result[query.__NAME__] = str(e)
             result = None
         except Exception as e:
             if self.raises:
@@ -76,14 +79,13 @@ class Radar(object):
         return result
 
     def resolve_action(self, action_data):
-        action_input = action_data.get('props', {})
-        action_requires = action_data.get('contains', {})
+        action_input = action_data.get('props', empty_dict)
+        action_requires = action_data.get('contains', empty_dict)
         action = self.get_action(action_data['name'])
-        action.transform_keys(self.transform_keys)
         result = {}
 
         try:
-            result = action.resolve(action_requires, **action_input)
+            result = action.resolve(action_requires, action_input)
         except (QueryError, ActionError, ActionError, QueryErrors):
             result = None
         except Exception as e:

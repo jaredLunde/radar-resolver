@@ -23,7 +23,7 @@ def to_js_keys(output):
 
 
 @memoize
-def to_python_key(key):
+def to_js_key(key):
     camel = list(string_tools.underscore_to_camel(key))
     next_char = 0
 
@@ -44,7 +44,7 @@ def to_python_key(key):
 
 
 @memoize
-def to_js_key(key):
+def to_python_key(key):
     return string_tools.camel_to_underscore(key)
 
 

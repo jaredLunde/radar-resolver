@@ -8,7 +8,7 @@ def default_cast(x):
     return x
 
 
-def default_resolver(field_name, state, **context):
+def default_resolver(field_name, state, record=None, query=None, **context):
     try:
         return state[field_name]
     except (KeyError, TypeError):
@@ -41,7 +41,10 @@ class Field(object):
 
     def __call__(self, value=None):
         if value is not None:
-            return self.cast(value)
+            try:
+                return self.cast(value) if isinstance(value, self.cast) else value
+            except TypeError:
+                return self.cast(value)
         else:
             if self.default is None:
                 if self.not_null:

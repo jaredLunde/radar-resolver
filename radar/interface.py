@@ -21,7 +21,7 @@ def get_fields(attrs):
     for k, v in attrs.items():
         field = attrs[k]
         is_interface = hasattr(field, '__is_radar_interface__')
-        
+
         if is_interface or isinstance(attrs[k], Field):
             field.__NAME__ = k
             yield field
@@ -40,7 +40,7 @@ class Interface(object, metaclass=MetaInterface):
 
     def __new__(cls, *a, **kw):
         interface = super().__new__(cls)
-        interface.__init__(interface, *a, **kw)
+        interface.__init__(*a, **kw)
         interface.fields = tuple(
             field
             for k, v in get_class_attrs(interface.__class__)
