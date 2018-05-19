@@ -2,6 +2,10 @@ class FieldNotFound(Exception):
     pass
 
 
+class MissingApplyMethod(Exception):
+    pass
+
+
 class RecordKeyError(Exception):
     pass
 

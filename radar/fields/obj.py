@@ -1,13 +1,16 @@
-from radar.fields.field import Field
-from radar.members import Members
-from radar.exceptions import FieldNotFound
-from radar.utils import transform_keys
+from .field import Field
+from ..members import Members
+from ..exceptions import FieldNotFound
+from ..utils import transform_keys
+
+
+__all__ = 'Obj',
 
 
 def obj_resolver(obj_field):
     def resolver(query, record, fields=None, **data):
         fields = fields or []
-        return obj_field.get_value({
+        return obj_field.__call__({
             transform_keys(field.__NAME__, record._transform_keys):
                 field.resolve(query=query, record=record, fields=fields, **data)
             for field in obj_field.get_fields(*fields)
@@ -16,10 +19,9 @@ def obj_resolver(obj_field):
 
 
 class Obj(Field, Members):
-    __slots__ = Field.__slots__ + ['fields']
+    __slots__ = (*Field.__slots__, 'fields')
 
-    def __init__(self, not_null=False, default=None, cast=None):
-        cast = cast or dict
+    def __init__(self, not_null=False, default=None, cast=dict):
         super().__init__(obj_resolver, key=False, not_null=not_null,
                          default=default, cast=cast)
         self.resolver = obj_resolver(self)
@@ -52,7 +54,7 @@ class Obj(Field, Members):
                                         f'the object "{self.__NAME__}"')
 
     def resolve(self, query, record, **data):
-        return self.get_value(self.resolver(query, record, **data))
+        return self.__call__(self.resolver(query, record, **data))
 
     def copy(self):
         return self.__class__(not_null=self.not_null,

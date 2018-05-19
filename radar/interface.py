@@ -1,13 +1,15 @@
 import json
 from vital.debug import preprX
 
-from radar.fields import Field
-from radar.members import Members
-from radar.utils import to_js_keys, to_js_shape
+from .exceptions import MissingApplyMethod
+from .fields import Field
+from .utils import to_js_keys, to_js_shape, get_class_attrs
+
+
+__all__ = 'get_fields',
 
 
 JS_TPL = '''import {{createInterface}} from 'react-radar'
-
 
 export default createInterface({{
   name: '{name}',
@@ -15,41 +17,45 @@ export default createInterface({{
 }})'''
 
 
-class Interface(Members):
+def get_fields(attrs):
+    for k, v in attrs.items():
+        field = attrs[k]
+        is_interface = hasattr(field, '__is_radar_interface__')
+        
+        if is_interface or isinstance(attrs[k], Field):
+            field.__NAME__ = k
+            yield field
 
-    def __init__(self):
-        """ @many: will return #list if @many is |True|
-        """
-        self.__NAME__ = self.__NAME__ if hasattr(self, '__NAME__') else \
-                        self.__class__.__name__
-        self._fields = []
-        self._compile()
 
-    __repr__ = preprX('__NAME__', 'fields', address=False)
+class MetaInterface(type):
+    def __new__(cls, name, bases, attrs):
+        attrs['fields'] = tuple(get_fields(attrs))
+        return super().__new__(cls, name, bases, attrs)
 
-    '''def __new__(cls):
-        pass'''
 
-    def _compile(self):
-        """ Sets :class:Field attributes """
-        for field_name, field in self._getmembers():
-            if isinstance(field, (Field, Interface)):
-                self.add_field(field_name, field)
+class Interface(object, metaclass=MetaInterface):
+    __slots__ = tuple()
+    __repr__ = preprX('fields', address=False)
+    __is_radar_interface__ = True
 
-    def add_field(self, field_name, field):
-        field = field.copy()
-        field.__NAME__ = field_name
-        self._fields.append(field)
-        setattr(self, field_name, field)
+    def __new__(cls, *a, **kw):
+        interface = super().__new__(cls)
+        interface.__init__(interface, *a, **kw)
+        interface.fields = tuple(
+            field
+            for k, v in get_class_attrs(interface.__class__)
+            if k == 'fields'
+            for field in v
+        )
+        return interface
 
-    @property
-    def fields(self):
-        return self._fields
+    def copy(self):
+        return self.__class__()
 
     def to_js(self, indent=2, plugins=None):
         shape = {}
 
-        for field in self._fields:
+        for field in self.fields:
             if isinstance(field, self.__class__):
                 shape[field.__NAME__] = field.to_js()
             else:
@@ -59,10 +65,24 @@ class Interface(Members):
             for plugin in plugins:
                 shape = plugin(shape)
 
-        output = JS_TPL.format(name=self.__NAME__,
+        output = JS_TPL.format(name=self.__class__.__name__,
                                shape=to_js_shape(shape, indent))
 
         return to_js_keys(output)
 
-    def copy(self):
-        return self.__class__()
+
+'''
+from radar import Interface, fields
+
+class MyInterface(Interface):
+    foo = fields.String(key=True)
+    bar = fields.Int()
+
+class MySubInterface(MyInterface):
+    baz = fields.Array()
+
+MySubInterface()
+
+from vital.debug import Timer
+Timer(MySubInterface).time(1E5)
+'''

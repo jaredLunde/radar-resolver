@@ -1,126 +1,165 @@
 from vital.debug import preprX
-from radar.members import Members
-from radar.record import Record
-from radar.interface import Interface
-from radar.exceptions import QueryError, QueryErrors, ActionErrors, RecordIsNull
-from radar.utils import transform_keys
+from .record import Record
+from .interface import Interface
+from .exceptions import (
+    QueryError,
+    QueryErrors,
+    ActionErrors,
+    RecordIsNull,
+    MissingApplyMethod
+)
+from .utils import to_python_key, get_class_attrs
 
 
-def transform_deep_keys(props, do_transform=True):
-    return {transform_keys(key, do_transform, False):
-            (val if not isinstance(val, dict) else
-             transform_deep_keys(val, do_transform))
-            for key, val in props.items()}
+__all__ = 'transform_deep_keys', 'Query'
 
 
-class Query(Members):
+def transform_deep_keys(props):
+    return {
+        to_python_key(key): (
+            val if not isinstance(val, dict) else transform_deep_keys(val)
+        )
+        for key, val in props.items()
+    }
 
-    def __init__(self, plugins=None, callback=None):
-        self.__NAME__ = self.__NAME__ if hasattr(self, '__NAME__') else \
-                        self.__class__.__name__
-        self.callback = callback
-        self.records = []
-        self.plugins = []
-        self.record_names = []
-        self.install(*plugins or [])
-        self._transform_keys = None
-        self._compile()
 
-    __repr__ = preprX('__NAME__', address=False)
+def get_records(attrs):
+    for k, v in attrs.items():
+        record = attrs[k]
 
-    def transform_keys(self, truthy_falsy=None):
-        self._transform_keys = True if truthy_falsy is None else truthy_falsy
+        if isinstance(record, Record):
+            record.__NAME__ = k
+            yield record
 
-    def transform(self, field_name, to_js=True):
-        return transform_keys(field_name, self._transform_keys, to_js)
 
-    def _compile(self):
-        """ Sets :class:Record attributes """
-        add_record = self.records.append
-        add_record_name = self.record_names.append
-        set_record = self.__setattr__
+class MetaQuery(type):
+    def __new__(cls, name, bases, attrs):
+        attrs['records'] = tuple(get_records(attrs))
+        return super().__new__(cls, name, bases, attrs)
 
-        for record_name, record in self._getmembers():
-            if isinstance(record, (Record, Interface)):
-                record = record.copy()
-                add_record(record)
-                add_record_name(record_name)
-                set_record(record_name, record)
 
-        if not len(self.records):
-            raise QueryError(f'Query `{self.__NAME__}` does not have any '
-                              'assigned Records. Queries must include returnable '
-                              'Records.')
+class Query(object, metaclass=MetaQuery):
+    __slots__ = 'callback',
 
-    def install(self, *plugins):
-        self.plugins.extend(plugins)
+    def __init__(self, callback=None):
+        self._callback = callback
 
-    def execute_plugins(self, **props):
-        for plugin in self.plugins:
-            plugin(self, **props)
+    __repr__ = preprX('records', address=False)
+
+    def __new__(cls, *a, **kw):
+        query = super().__new__(cls)
+        query.__init__(query, *a, **kw)
+        query.records = tuple(
+            record
+            for k, record in get_class_attrs(query.__class__)
+            if isinstance(record, (Record, Interface))
+        )
+
+        if not len(query.records):
+            raise QueryError(
+                f'Query `{cls.__name__}` does not have any assigned Records. '
+                'Queries must include returnable Records.'
+            )
+
+        try:
+            setattr(query, '__call__', query.apply)
+        except AtrributeError:
+            raise MissingApplyMethod(
+                f'Query {name} is missing an `apply` method. All queries must '
+                'include an `apply` method which returns state for the records.'
+            )
+
+        return query
 
     def get_required_records(self, records):
-        rn = {}
-
         if records:
-            for record_name, fields in records.items():
-                record_name = self.transform(record_name, False)
-
-                try:
-                    # record = getattr(self, record_name).copy()
-                    record = getattr(self, record_name)
-                    record.transform_keys(self._transform_keys)
-                except AttributeError:
-                    raise QueryError(f'Record `{record_name}` not found in '
-                                     f'Query `{self.__NAME__}`.')
-
-                rn[record_name] = record.get_required_fields(fields)
-        else:
-            for record_name in self.record_names:
-                record_name = self.transform(record_name, False)
-                # record = getattr(self, record_name).copy()
-                record = getattr(self, record_name)
-                record.transform_keys(self._transform_keys)
-                rn[record_name] = record.get_required_fields()
-
-        return rn
-
-    def resolve(self, records=None, **props):
-        out = {}
-        props = transform_deep_keys(props, self._transform_keys)
-        required_records = self.get_required_records(records or {})
-
-        #: Execute local plugins
-        self.execute_plugins(records=required_records, **props)
-        #: Executes the apply function which is meant to perform the actual
-        #  query task
-        data = None
-
-        if hasattr(self, 'apply'):
-            data = self.apply(required_records, **props)
-
-        data = {} if data is None else data
-
-        for record_name, fields in required_records.items():
-            # record = getattr(self, record_name).copy()
-            record = getattr(self, record_name)
-            record.transform_keys(self._transform_keys)
-            record_name = self.transform(record_name)
-
             try:
-                result = record.resolve(self, fields=fields, **data)
+                for record_name, fields in records.items():
+                    yield (
+                        record_name,
+                        getattr(self, record_name).get_required_fields(fields)
+                    )
+            except AttributeError:
+                raise QueryError(
+                    f'Record `{record_name}` not found in '
+                    f'Query `{self.__class__.__name__}`.'
+                )
+        else:
+            for record in self.records:
+                yield (
+                    record.__NAME__,
+                    getattr(self, record.__NAME__).get_required_fields()
+                )
+
+    def resolve(self, records, **props):
+        required_records = self.get_required_records(transform_deep_keys(records) or {})
+
+        # executes the apply function which is meant to fetch the result of
+        # the actual query task
+        state = self.apply(required_records, **transform_deep_keys(props))
+        state = {} if state is None else state
+        output = {}
+
+        for record_name, fields in required_records:
+            try:
+                result = getattr(self, record_name).resolve(
+                    fields,
+                    state,
+                    query=self
+                )
             except RecordIsNull:
                 result = None
 
-            out[record_name] = result
+            output[record_name] = result
 
-        try:
-            return self.callback(self, out)
-        except TypeError:
-            return out
+        if self._callback:
+            return self._callback(output, query=self)
+        else:
+            return output
 
     def copy(self):
-        cls = self.__class__(plugins=self.plugins, callback=self.callback)
-        cls._transform_keys = self._transform_keys
+        return self.__class__(callback=self._callback)
 
-        return cls
+
+'''
+from radar import Interface, Record, Query, fields
+from vital.debug import Timer
+
+class MyInterface(Interface):
+    foo = fields.String(key=True)
+    bar = fields.Int()
+
+class MySubInterface(MyInterface):
+    baz = fields.Array()
+
+MySubInterface()
+
+Timer(MySubInterface).time(1E4)
+
+class MyRecord(Record):
+    implements = [MySubInterface]
+    boz = fields.Float()
+
+MyRecord()
+Timer(MyRecord).time(1E4)
+MyRecord.fields
+MyRecord().resolve({'foo': None}, {'foo': 'bar', 'bar': 'baz'})
+Timer(MyRecord().resolve, fields={'foo': None}, state={'foo': 'bar', 'bar': 'baz'}).time(1E4)
+
+class MyQuery(Query):
+    my = MyRecord()
+    def apply(*args, **kwargs):
+        return {'foo': 'bar', 'bar': 1, 'baz': ['a', 'b'], 'boz': 1.0}
+
+
+class MyQueries(Query):
+    my = MyRecord(many=True)
+    def apply(*args, **kwargs):
+        return [{'foo': 'bar', 'bar': 1, 'baz': ['a', 'b'], 'boz': 1.0}, {'foo': 'bar', 'bar': 2, 'baz': ['c', 'd'], 'boz': 2.0}]
+
+
+MyQuery().resolve({'my': {'foo': None}})
+MyQueries().resolve({'my': {'foo': None}})
+Timer(MyQueries().resolve, records={'my': {'foo': None}}).time(1E4)
+Timer(MyQuery().resolve, records={'my': {}}).time(1E4)
+'''

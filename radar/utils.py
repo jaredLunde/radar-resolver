@@ -4,7 +4,14 @@ from vital.cache import memoize
 from vital.tools import strings as string_tools
 
 
-__all__ = ('to_js_keys', 'transform_keys', 'to_js_shape')
+__all__ = (
+    'to_js_keys',
+    'transform_keys',
+    'to_js_shape',
+    'get_class_attrs',
+    'to_js_key',
+    'to_python_key'
+)
 
 
 js_keys_re = re.compile(r"""([^\\])"([A-Za-z]+[A-Za-z0-9_]*?)":""")
@@ -16,12 +23,7 @@ def to_js_keys(output):
 
 
 @memoize
-def camel_to_underscore(key):
-    return string_tools.camel_to_underscore(key)
-
-
-@memoize
-def to_snake(key):
+def to_python_key(key):
     camel = list(string_tools.underscore_to_camel(key))
     next_char = 0
 
@@ -41,14 +43,13 @@ def to_snake(key):
     return ''.join(camel)
 
 
-def transform_keys(key, truthy_falsy, to_js=True):
-    # print(repr(key))
-    if truthy_falsy is True:
-        camel = string_tools.camel_to_underscore(key) if to_js is False else\
-                to_snake(key)
+@memoize
+def to_js_key(key):
+    return string_tools.camel_to_underscore(key)
 
-        return camel
-    return key
+
+def transform_keys(key, truthy_falsy, to_js=True):
+    return string_tools.camel_to_underscore(key) if to_js is False else to_snake(key)
 
 
 def to_js_shape(shape, indent):
@@ -57,3 +58,10 @@ def to_js_shape(shape, indent):
         for idx, line in
             enumerate(json.dumps(shape, indent=indent).split('\n'))
     )
+
+
+def get_class_attrs(base_cls):
+    for cls in reversed(base_cls.__mro__):
+        if cls != type and cls != object:
+            for items in cls.__dict__.items():
+                yield items

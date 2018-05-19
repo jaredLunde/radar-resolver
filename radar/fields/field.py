@@ -1,58 +1,65 @@
 from vital.debug import preprX
 
 
-__all__ = ('Field',)
+__all__ = 'Field',
 
 
-def _cast(x):
+def default_cast(x):
     return x
 
 
-class Field(object):
-    __slots__ = ['key', 'cast', 'resolver', 'not_null', 'default', '__NAME__']
+def default_resolver(field_name, state, **context):
+    try:
+        return state[field_name]
+    except (KeyError, TypeError):
+        raise KeyError(
+            f'Key `{field_name}` not found in Record  `{record.__NAME__}` of '
+            f'Query `{query.__NAME__}`.'
+        )
 
-    def __init__(self, resolver=None, key=False, not_null=False, default=None,
-                 cast=None):
+
+class Field(object):
+    __slots__ = 'key', 'cast', 'resolver', 'not_null', 'default', '__NAME__'
+
+    def __init__(
+        self,
+        resolver=default_resolver,
+        key=False,
+        not_null=False,
+        default=None,
+        cast=default_cast
+    ):
         """ @key: Universally unique field which identifies your Schema """
         self.resolver = resolver
         self.not_null = not_null
-        self.cast = cast or _cast
+        self.cast = cast
         self.default = default
         self.key = key
-        # self.value = None
         self.__NAME__ = None
 
-    __repr__ = preprX('name', 'value', 'key', address=False)
+    __repr__ = preprX('__NAME__', 'key', address=False)
 
-    def get_value(self, value=None):
+    def __call__(self, value=None):
         if value is not None:
             return self.cast(value)
-        elif value is None and self.default is None and self.not_null:
-            raise ValueError(f'Field `{self.__NAME__}` cannot be null.')
-        elif value is None and self.default is not None:
-            return self.default
         else:
-            return None
-
-    def default_resolver(self, query=None, record=None, **data):
-        try:
-            return data[self.__NAME__]
-        except KeyError:
-            raise KeyError(f'Key `{self.__NAME__}` not found in Record '
-                           f'`{record.__NAME__}` of Query `{query.__NAME__}` '
-                           f'containing `{data}`')
-
-    # def clear(self):
-    #     self.value = None
-    #     return self
+            if self.default is None:
+                if self.not_null:
+                    raise ValueError(f'Field `{self.__NAME__}` cannot be null.')
+                else:
+                    return None
+            else:
+                return self.default
 
     def copy(self):
-        return self.__class__(self.resolver,
-                              key=self.key,
-                              not_null=self.not_null,
-                              default=self.default,
-                              cast=self.cast)
+        return self.__class__(
+            self.resolver,
+            key=self.key,
+            not_null=self.not_null,
+            default=self.default,
+            cast=self.cast
+        )
 
-    def resolve(self, query, record, **data):
-        resolver = self.resolver or self.default_resolver
-        return self.get_value(resolver(query=query, record=record, **data))
+    def resolve(self, state, **context):
+        output = self.resolver(self.__NAME__, state, **context)
+        return self.__call__(output)

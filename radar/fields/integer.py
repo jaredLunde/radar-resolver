@@ -1,11 +1,11 @@
-from radar.fields.field import Field
+from .field import Field
+
+
+__all__ = 'Int',
 
 
 class Int(Field):
     __slots__ = Field.__slots__
-    
-    def __init__(self, resolver=None, key=False, not_null=False, default=None,
-                 cast=None):
-        cast = cast or int
-        super().__init__(resolver, key=key, not_null=not_null, default=default,
-                         cast=cast)
+
+    def __init__(self, *a, cast=int, **kw):
+        super().__init__(*a, cast=cast, **kw)

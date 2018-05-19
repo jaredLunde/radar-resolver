@@ -3,7 +3,13 @@ try:
 except ImportError:
     import json
 
-from radar.exceptions import QueryError, ActionError, ActionError, QueryErrors, OperationNotFound
+from radar.exceptions import (
+    QueryError,
+    ActionError,
+    ActionError,
+    QueryErrors,
+    OperationNotFound
+)
 
 
 class Radar(object):

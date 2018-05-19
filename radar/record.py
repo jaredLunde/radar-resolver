@@ -1,68 +1,47 @@
-import json
-from vital.debug import preprX, colorize, bold
-
-from radar.fields import Field, Obj
-from radar.exceptions import FieldNotFound, RecordKeyError, RecordIsNull
-from radar.members import Members
-from radar.interface import Interface
-from radar.utils import to_js_keys, transform_keys, to_js_shape
+from vital.debug import preprX
+from .fields import Field, Obj
+from .exceptions import FieldNotFound, RecordKeyError, RecordIsNull
+from .interface import Interface
+from .utils import to_js_key, to_js_shape
 
 
-JS_TPL = '''import {{createRecord}} from 'react-radar'{imports}
+__all__ = 'Record', 'get_interface_fields',
 
 
-export default createRecord({{
-  name: '{name}',
-  implements: {interfaces},
-  fields: {shape}
-}})'''
+def get_interface_fields(record):
+    fields = record.fields
+    for interface_cls in record.implements:
+        for field in interface_cls().fields:
+            if field not in fields:
+                setattr(record, field.__NAME__, field)
+                yield field
 
 
 class Record(Interface):
+    __slots__ = '_key', '_callback', 'many',
 
     def __init__(self, callback=None, many=False):
-        """ @many: will return #list if @many is |True|
-        """
-        self.implements = [] if not hasattr(self, 'implements') else\
-                          self.implements
-        self._key = None
-        self.callback = callback
-        self.many = many
-        self._transform_keys = True
+        """ @many: will return #list if @many is |True| """
         super().__init__()
+        self._callback = callback
+        self._many = many
 
     __repr__ = preprX('__NAME__', 'fields', address=False)
 
-    def _compile(self):
-        """ Sets :class:Field attributes """
-        super()._compile()
-        self.implement(*self.implements)
+    def __new__(cls, *a, **kw):
+        record = super().__new__(cls)
+        record.__init__(record, *a, **kw)
 
-        if self._key is None:
-            raise RecordKeyError(f'Record `{self.__NAME__}` does not have a '
-                                 'designated key but requires one.')
+        if hasattr(record, 'implements'):
+            fields = get_interface_fields(record)
+            record.fields = tuple((*fields, *record.fields))
 
-    def transform_keys(self, truthy_falsy=None):
-        self._transform_keys = True if truthy_falsy is None else truthy_falsy
+        for field in record.fields:
+            if isinstance(field, Field) and field.key is True:
+                record._key = field
+                return record
 
-    def add_field(self, field_name, field):
-        super().add_field(field_name, field)
-        field = self._fields[-1]
-
-        if isinstance(field, Field) and field.key is True:
-            self._key = field
-
-    def implement(self, *interfaces):
-        for interface_cls in interfaces:
-            interface = interface_cls()
-
-            if interface_cls not in self.implements:
-                self.implements.append(interface_cls)
-
-            for field in interface.fields:
-                self.add_field(field.__NAME__, field)
-
-        return self
+        raise RecordKeyError(f'Record `{cls.__name__}` does not have a Key field.')
 
     def get_field(self, field_name):
         field = getattr(self, field_name)
@@ -75,202 +54,171 @@ class Record(Interface):
 
     def get_required_field(self, field, child_fields=None):
         fields = {}
-        if isinstance(field, Record):
-            fields[field.__NAME__] = field.get_required_fields(child_fields)
-        elif isinstance(field, Obj):
-            fields[field.__NAME__] = {
-                _field.__NAME__: self.get_required_field(
-                    _field,
-                    child_fields[_field.__NAME__] if child_fields else None
-                )
-                for _field in field.fields
-                if child_fields and _field.__NAME__ in child_fields
-            }
-        else:
-            fields[field.__NAME__] = None
 
-        return fields
+        if isinstance(field, Record):
+            yield field.__NAME__, field.get_required_fields(child_fields)
+        elif isinstance(field, Obj):
+            if child_fields:
+                for child_field in field.fields:
+                    if child_fields and child_field.__NAME__ in child_fields:
+                        yield (
+                            child_field.__NAME__,
+                            self.get_required_field(
+                                child_field,
+                                child_fields[child_field.__NAME__]
+                                    if child_fields else
+                                    None
+                            )
+                        )
+        else:
+            yield field.__NAME__, None
 
     def get_required_fields(self, input_fields=None):
-        fields = {}
+        #: TODO: tailcall optimiztaion w/ while loop
+        output = {}
 
         if input_fields is None or not len(input_fields):
-            for field in self._fields:
-                fields.update(self.get_required_field(field))
+            for field in self.fields:
+                for k, v in self.get_required_field(field):
+                    output[k] = v
         else:
             for field_name, child_fields in input_fields.items():
-                field_name = self.transform(field_name, False)
+                # field_name = to_python_key(field_name)
                 field = self.get_field(field_name)
-                fields.update(self.get_required_field(field, child_fields))
+                for k, v in self.get_required_field(field, child_fields):
+                    output[k] = v
 
-        return fields
+        return output
 
-    def resolve_field(self, query, field_name, sub_fields=None, **data):
-        field = self.get_field(self.transform(field_name, False))
-
+    def resolve_field(self, field_name, state, fields=None, **context):
+        field = self.get_field(field_name)
 
         if isinstance(field, Record):
             try:
-                # return field.copy().resolve(
-                #     query=query,
-                #     record=self,
-                #     fields=sub_fields,
-                #     **data
-                # )
-                # return field.resolve(query, self, fields=sub_fields, **data)
-                return field.resolve(query, fields=sub_fields, **data)
+                return field.resolve(fields, state, **context)
             except RecordIsNull:
                 return None
         else:
-            if sub_fields is None:
-                return field.resolve(query, self, fields=None, **data)
+            if fields is None:
+                return field.resolve(state, record=self, **context)
 
-            return field.resolve(query, self, fields=sub_fields, **data)
+            return field.resolve(state, record=self, fields=fields, **context)
 
-    def transform(self, field_name, to_js=True):
-        return transform_keys(field_name, self._transform_keys, to_js)
-
-    def resolve_fields(self, query, fields, **data):
+    def resolve_fields(self, fields, state, **context):
         if fields:
-            for field_name, sub_fields in fields.items():
-                if sub_fields is not None:
-                    yield (field_name,
-                           self.resolve_field(query, field_name, sub_fields, **data))
+            for field_name, nested in (fields.items() if hasattr(fields, 'items') else fields):
+                if nested is not None:
+                    yield (
+                        field_name,
+                        self.resolve_field(field_name, state, fields=nested, **context)
+                    )
                 else:
-                    yield (field_name,
-                           self.resolve_field(query, field_name, **data))
+                    yield (
+                        field_name,
+                        self.resolve_field(field_name, state, **context)
+                    )
         else:
-            for field in self._fields:
-                yield (field.__NAME__,
-                       self.resolve_field(query, field.__NAME__, **data))
+            for field in self.fields:
+                yield (
+                    field.__NAME__,
+                    self.resolve_field(field.__NAME__, state, **context)
+                )
 
-    def _resolve(self, query, fields, index=None, **data):
-        data = self.apply(query, fields, index=index, **data) or {}
+    def _resolve(self, fields, state, **context):
+        state = self.reduce(state, fields=fields, **context) or {}
 
-        if not isinstance(data, dict):
-            raise TypeError('Data returned by `apply` methods must be of type'
-                            f'`dict`. "{data}" is not a dict in Record: '
+        if not isinstance(state, dict):
+            raise TypeError('Data returned by `reduce` methods must be of type'
+                            f'`dict`. "{state}" is not a dict in Record: '
                             f'{self.__class__.__name__}')
 
-        out = {
-            self.transform(name): value
-            for name, value in self.resolve_fields(
-                query,
-                fields,
-                index=index,
-                **data
-             )
+        output = {
+            to_js_key(name): value
+            for name, value in self.resolve_fields(fields, state, **context)
         }
 
         if self._key.__NAME__ not in fields:
-            out[self._key.__NAME__] = self.resolve_field(
-                query,
+            output[self._key.__NAME__] = self.resolve_field(
                 self._key.__NAME__,
-                index=index,
-                **data
+                state,
+                fields=fields,
+                **context
             )
 
-        if out[self._key.__NAME__] is None:
+        if output[self._key.__NAME__] is None:
             raise RecordKeyError(
                 f'Record `{self.__NAME__}` did not have a Key field '
                 'with a value. Your Key field cannot ever return None.'
             )
 
         try:
-            return self.callback(self, out)
+            return self._callback(self, output)
         except TypeError:
-            return out
+            return output
 
-    def _resolve_many(self, query, fields, index=None, **data):
+    def _resolve_many(self, *a, index=None, **kw):
+        ''' includes index outside of kwargs in order to ignore it '''
         index = 0
-        out = []
-        append_out = out.append
+        output = []
+        add_output = output.append
 
         while True:
             try:
-                append_out(
-                    # self.copy()._resolve(
-                    #     query,
-                    #     fields,
-                    #     index=index,
-                    #     **data
-                    # )
-                    self._resolve(query, fields, index=index, **data)
-                )
+                add_output(self._resolve(*a, index=index, **kw))
             except IndexError:
                 break
 
             index += 1
 
-        return out
+        return output
 
-    def resolve(self, query, fields, index=None, **data):
-        self.transform_keys(query._transform_keys)
-
-        if self.many:
+    def resolve(self, fields, state,  **context):
+        if self._many:
             resolver = self._resolve_many
         else:
             resolver = self._resolve
 
-        return resolver(query, fields, index=index, **data)
+        return resolver(fields, state, **context)
 
     def clear(self):
-        for field in self._fields:
+        for field in self.fields:
             field.clear()
 
         return self
 
-    def apply(self, query, fields, index=None, **data):
-        return data
+    def reduce(self, state, fields=None, query=None, index=None):
+        if index is not None:
+            return state[index]
+        else:
+            return state
 
     def copy(self):
-        cls = self.__class__(callback=self.callback, many=self.many)
+        cls = self.__class__(callback=self._callback, many=self._many)
         return cls
 
-    def to_js(self, indent=2, plugins=None):
-        shape = {}
 
-        interface_fields = set()
-        interface_names = []
+'''
+from radar import Interface, Record, fields
 
-        for interface_cls in self.implements:
-            interface = interface_cls()
-            interface_fields = interface_fields.union(
-                set(field.__NAME__ for field in interface.fields)
-            )
-            interface_names.append(interface.__NAME__)
+class MyInterface(Interface):
+    foo = fields.String(key=True)
+    bar = fields.Int()
 
-        records = [record for record in self.fields if isinstance(record, Record)]
+class MySubInterface(MyInterface):
+    baz = fields.Array()
 
-        for field in self._fields:
-            if isinstance(field, Record):
-                shape[self.transform(field.__NAME__)] =\
-                    f'{field.__class__.__name__}.fields'
-            elif field.__NAME__ not in interface_fields:
-                if isinstance(field, Obj):
-                    shape[self.transform(field.__NAME__)] = None
-                else:
-                    shape[self.transform(field.__NAME__)] = None
+MySubInterface()
 
-        if plugins:
-            for plugin in plugins:
-                shape = plugin(shape)
+from vital.debug import Timer
+Timer(MySubInterface).time(1E5)
 
-        imports = [
-            f"import {iface} from '../interfaces/{iface}'"
-            for iface in interface_names
-        ]
+class MyRecord(Record):
+    implements = [MySubInterface]
+    boz = fields.Float()
 
-        imports.extend(
-            f"import {record.__class__().__NAME__} from './{record.__class__().__NAME__}'"
-            for record in self.fields if isinstance(record, Record)
-        )
-
-        output = JS_TPL.format(
-            name=self.__NAME__,
-            shape=to_js_shape(shape, indent),
-            interfaces=str(interface_names).replace("'", ''),
-            imports='\n' + '\n'.join(imports) if imports else ''
-        )
-
-        return to_js_keys(output)
+MyRecord()
+Timer(MyRecord).time(1E5)
+MyRecord.fields
+MyRecord().resolve({'foo': None}, {'foo': 'bar', 'bar': 'baz'})
+Timer(MyRecord().resolve, fields={'foo': None}, state={'foo': 'bar', 'bar': 'baz'}).time(1E5)
+'''
