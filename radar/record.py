@@ -18,11 +18,11 @@ def get_interface_fields(record):
 
 
 class Record(Interface):
-    def __init__(self, callback=None, many=False):
+    def __init__(self, many=False, callback=None):
         """ @many: will return #list if @many is |True| """
         super().__init__()
-        self._callback = callback
         self._many = many
+        self._callback = callback
 
     __repr__ = preprX('__NAME__', 'fields', address=False)
 
@@ -101,7 +101,8 @@ class Record(Interface):
 
     def resolve_fields(self, fields, state, **context):
         if fields:
-            for field_name, nested in (fields.items() if hasattr(fields, 'items') else fields):
+            fields = fields.items() if hasattr(fields, 'items') else fields
+            for field_name, nested in fields:
                 if nested is not None:
                     yield (
                         field_name,

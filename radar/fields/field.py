@@ -42,7 +42,7 @@ class Field(object):
     def __call__(self, value=None):
         if value is not None:
             try:
-                return self.cast(value) if isinstance(value, self.cast) else value
+                return self.cast(value) if not isinstance(value, self.cast) else value
             except TypeError:
                 return self.cast(value)
         else:
