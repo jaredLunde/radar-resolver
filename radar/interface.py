@@ -34,7 +34,6 @@ class MetaInterface(type):
 
 
 class Interface(object, metaclass=MetaInterface):
-    __slots__ = tuple()
     __repr__ = preprX('fields', address=False)
     __is_radar_interface__ = True
 

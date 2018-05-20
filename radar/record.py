@@ -18,8 +18,6 @@ def get_interface_fields(record):
 
 
 class Record(Interface):
-    __slots__ = '_key', '_callback', 'many', '__NAME__'
-
     def __init__(self, callback=None, many=False):
         """ @many: will return #list if @many is |True| """
         super().__init__()

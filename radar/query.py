@@ -39,8 +39,6 @@ class MetaQuery(type):
 
 
 class Query(object, metaclass=MetaQuery):
-    __slots__ = 'callback', '__NAME__'
-
     def __init__(self, callback=None):
         self._callback = callback
 

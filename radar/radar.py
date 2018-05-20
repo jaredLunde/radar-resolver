@@ -16,6 +16,7 @@ empty_dict = {}
 
 class Radar(object):
     __slots__ = 'queries', 'actions', 'raises'
+    
     def __init__(self, queries=None, actions=None, raises=True):
         self.queries = {}
         self.actions = {}

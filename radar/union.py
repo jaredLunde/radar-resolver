@@ -7,8 +7,6 @@ from .utils import get_class_attrs, to_js_key
 
 
 class Union(Record):
-    __slots__ = Record.__slots__
-
     def __new__(cls, *a, **kw):
         union = super(Interface, cls).__new__(cls)
         union.__init__(*a, **kw)
