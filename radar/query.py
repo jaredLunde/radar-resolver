@@ -61,7 +61,7 @@ class Query(object, metaclass=MetaQuery):
 
         try:
             setattr(query, '__call__', query.apply)
-        except AtrributeError:
+        except AttributeError:
             raise MissingApplyMethod(
                 f'Query {name} is missing an `apply` method. All queries must '
                 'include an `apply` method which returns state for the records.'

@@ -6,7 +6,7 @@ except ImportError:
 from radar.exceptions import (
     QueryError,
     ActionError,
-    ActionError,
+    ActionErrors,
     QueryErrors,
     OperationNotFound
 )
@@ -16,7 +16,7 @@ empty_dict = {}
 
 class Radar(object):
     __slots__ = 'queries', 'actions', 'raises'
-    
+
     def __init__(self, queries=None, actions=None, raises=True):
         self.queries = {}
         self.actions = {}
@@ -28,6 +28,18 @@ class Radar(object):
 
     def __call__(self, state, is_json=True):
         return self.resolve(state, is_json=is_json)
+
+    def action(self, *a, **kw):
+        def apply(cls):
+            self.install_action(cls(*a, **kw))
+            return cls
+        return apply
+
+    def query(self, *a, **kw):
+        def apply(cls):
+            self.install_query(cls(*a, **kw))
+            return cls
+        return apply
 
     def install_query(self, *queries):
         for query in queries:
@@ -72,7 +84,7 @@ class Radar(object):
 
         try:
             result = query.resolve(query_requires, query_params)
-        except (QueryError, ActionError, ActionError, QueryErrors):
+        except (QueryError, ActionError, ActionErrors, QueryErrors):
             result = None
         except Exception as e:
             if self.raises:
@@ -88,7 +100,7 @@ class Radar(object):
 
         try:
             result = action.resolve(action_requires, action_input)
-        except (QueryError, ActionError, ActionError, QueryErrors):
+        except (QueryError, ActionError, ActionErrors, QueryErrors):
             result = None
         except Exception as e:
             if self.raises:
@@ -110,7 +122,9 @@ class Radar(object):
             elif operation['name'] in self.actions:
                 add_out(self.resolve_action(operation))
             else:
-                raise OperationNotFound('An action or query with the name '
-                                        f'{operation.type} was not found.')
+                raise OperationNotFound(
+                    f'An action or query with the name {operation["name"]} was '
+                    'not found.'
+                )
 
         return out
