@@ -1,3 +1,4 @@
+from .exceptions import RecordIsNull
 from .interface import Interface
 from .record import Record
 from .fields import Field
@@ -46,6 +47,13 @@ class Union(Record):
         raise FieldNotFound(f'Field named `{field_name}` was not found in '
                             f'Record `{self.__NAME__}`')
 
+    def resolve_field(self, field_name, state, fields=None, record=None, **context):
+        field = self.get_field(field_name)
+        try:
+            return field.resolve(fields, state, **context)
+        except RecordIsNull:
+            return None
+
     def resolve_fields(self, fields, state, **context):
         fields = fields or {}
         record_type = self.get_record_type(state, fields=fields, **context)
@@ -67,7 +75,7 @@ class Union(Record):
         state = self.reduce(state, fields=fields, index=index, **context) or {}
 
         if not isinstance(state, dict):
-            raise TypeError('Data returned by `apply` methods must be of type'
+            raise TypeError('Data returned by `reduce` methods must be of type'
                             f'`dict`. "{state}" is not a dict in Record: '
                             f'{self.__class__.__name__}')
 
@@ -77,10 +85,6 @@ class Union(Record):
             return self._callback(output, self)
         except TypeError:
             return output
-
-    # @staticmethod
-    # def reduce(state, **context):
-    #     return state
 
 '''
 from radar import Interface, Record, Query, Union, fields
@@ -102,17 +106,30 @@ class MyRecord(Record):
     implements = [MySubInterface]
     boz = fields.Float()
 
+class MyRecord2(Record):
+    boz = fields.Float(key=True)
+
 class MyUnion(Union):
     my = MyRecord()
-    def get_record_type(*a, **kw):
-        return 'my'
+    your = MyRecord2()
+    @staticmethod
+    def get_record_type(state, *a, **kw):
+        return 'your' if state.get('your') else 'my'
 
-MyUnion().resolve({'my': {'foo': None}}, {'foo': 'bar'})
+MyUnion().resolve({'my': {'foo': None}}, {'my': {'foo': 'bar'}})
 
-class MyQuery(Query):
-    my = MyUnion()
-    def apply(*args, **kwargs):
-        return {'foo': 'bar', 'bar': 1, 'baz': ['a', 'b'], 'boz': 1.0}
+class MyUnionMany(Union):
+    my = MyRecord(many=True)
+    your = MyRecord2()
+    @staticmethod
+    def get_record_type(state, *a, **kw):
+        return 'your' if state.get('your') else 'my'
 
-Timer(MyQuery().resolve, records={'my': {'my': {}}}).time(1E4)
+MyUnionMany().resolve({'my': {'foo': None}}, {'my': [{'foo': 'bar'}]})
+
+class MyRecordMany(Record):
+    key = fields.String(key=True)
+    my = MyUnion(many=True)
+
+MyRecordMany().resolve({'my': {'my': {'foo': None}, 'your': {'boz': None}}}, {'my': [{'my': {'foo': 'bar'}}, {'my': {'foo': 'bar2'}}, {'your': {'boz': 1.0}}], 'key': 1})
 '''

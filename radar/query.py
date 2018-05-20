@@ -39,7 +39,7 @@ class MetaQuery(type):
 
 
 class Query(object, metaclass=MetaQuery):
-    __slots__ = 'callback',
+    __slots__ = 'callback', '__NAME__'
 
     def __init__(self, callback=None):
         self._callback = callback
@@ -106,7 +106,7 @@ class Query(object, metaclass=MetaQuery):
             try:
                 result = getattr(self, record_name).resolve(
                     fields,
-                    state,
+                    state[record_name],
                     query=self
                 )
             except RecordIsNull:

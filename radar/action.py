@@ -2,4 +2,4 @@ from radar.query import Query
 
 
 class Action(Query):
-    pass
+    __slots__ = Query.__slots__

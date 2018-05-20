@@ -18,7 +18,7 @@ def get_interface_fields(record):
 
 
 class Record(Interface):
-    __slots__ = '_key', '_callback', 'many',
+    __slots__ = '_key', '_callback', 'many', '__NAME__'
 
     def __init__(self, callback=None, many=False):
         """ @many: will return #list if @many is |True| """
@@ -87,12 +87,12 @@ class Record(Interface):
 
         return output
 
-    def resolve_field(self, field_name, state, fields=None, **context):
+    def resolve_field(self, field_name, state, fields=None, record=None, **context):
         field = self.get_field(field_name)
 
         if isinstance(field, Record):
             try:
-                return field.resolve(fields, state, **context)
+                return field.resolve(fields, state, record=self, **context)
             except RecordIsNull:
                 return None
         else:
@@ -185,8 +185,11 @@ class Record(Interface):
 
         return self
 
-    @staticmethod
-    def reduce(state, index=None, **context):
+    def reduce(self, state, index=None, **context):
+        if context.get('record'):
+            state = state[self.__NAME__]
+        if state is None:
+            raise RecordIsNull()
         if index is None:
             return state
         else:
@@ -225,6 +228,7 @@ Timer(MyRecord().resolve, fields={'foo': None}, state={'foo': 'bar', 'bar': 'baz
 class MyNestedRecord(Record):
     implements = [MySubInterface]
     boz = fields.Float()
+
 
 class MyRecord(Record):
     uid = fields.String(key=True)
