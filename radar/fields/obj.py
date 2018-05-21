@@ -14,7 +14,7 @@ class Obj(Field, Interface):
         def resolver(state, fields=None, **context):
             return {
                 to_js_key(field.__NAME__): field.resolve(state[self.__NAME__], **context)
-                for field in self.get_fields(fields or [])
+                for field in self.get_fields(fields)
             }
 
         super().__init__(
@@ -25,9 +25,8 @@ class Obj(Field, Interface):
             cast=cast
         )
 
-
     def get_fields(self, fields):
-        if not len(fields):
+        if fields is None:
             for field in self.fields:
                 yield field
         else:
