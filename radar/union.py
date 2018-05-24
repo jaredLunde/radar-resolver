@@ -53,9 +53,10 @@ class Union(Record):
             return None
 
     def resolve_fields(self, fields, state, **context):
+        # TODO: only resolve if record type is in @fields
         fields = fields or {}
         record_type = self.get_record_type(state, fields=fields, **context)
-
+        
         if record_type is None:
             raise TypeError('Unions must return a string from their '
                             '`get_record_type` method specifying the proper Record'

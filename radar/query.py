@@ -8,7 +8,7 @@ from .exceptions import (
     RecordIsNull,
     MissingApplyMethod
 )
-from .utils import to_python_key, get_class_attrs
+from .utils import to_python_key, to_js_key, get_class_attrs
 
 
 __all__ = 'transform_deep_keys', 'Query'
@@ -110,7 +110,7 @@ class Query(object, metaclass=MetaQuery):
             except RecordIsNull:
                 result = None
 
-            output[record_name] = result
+            output[to_js_key(record_name)] = result
 
         if self._callback:
             return self._callback(output, query=self)
