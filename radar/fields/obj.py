@@ -26,7 +26,7 @@ class Obj(Field, Interface):
         )
 
     def get_fields(self, fields):
-        if fields is None:
+        if not fields:
             for field in self.fields:
                 yield field
         else:
