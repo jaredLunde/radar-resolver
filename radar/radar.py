@@ -77,7 +77,8 @@ class Radar(object):
         return self.actions[action_name]
 
     def resolve_query(self, query_data):
-        query_requires = query_data.get('contains', empty_dict)
+        # query_requires = query_data.get('contains', empty_dict)
+        query_requires = query_data.get('requires', empty_dict)
         query_params = query_data.get('props', empty_dict)
         query = self.get_query(query_data['name'])
         result = {}
@@ -94,7 +95,8 @@ class Radar(object):
 
     def resolve_action(self, action_data):
         action_input = action_data.get('props', empty_dict)
-        action_requires = action_data.get('contains', empty_dict)
+        # action_requires = action_data.get('contains', empty_dict)
+        action_requires = action_data.get('requires', empty_dict)
         action = self.get_action(action_data['name'])
         result = {}
 
